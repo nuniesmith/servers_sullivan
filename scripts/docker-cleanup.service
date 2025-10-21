@@ -1,0 +1,21 @@
+[Unit]
+Description=Docker Cache Cleanup for SULLIVAN
+Documentation=https://github.com/nuniesmith/personal_servers_sullivan
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/path/to/sullivan
+ExecStart=/path/to/sullivan/scripts/cleanup-docker-cache.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=docker-cleanup-sullivan
+
+# Security
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

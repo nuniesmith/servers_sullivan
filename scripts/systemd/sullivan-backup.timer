@@ -1,0 +1,18 @@
+[Unit]
+Description=SULLIVAN Backup Timer
+Documentation=https://github.com/nuniesmith/personal_servers_sullivan
+Requires=sullivan-backup.service
+
+[Timer]
+# Run daily at 3 AM (offset from FREDDY)
+OnCalendar=daily
+OnCalendar=*-*-* 03:00:00
+
+# Run 10 minutes after boot if missed
+Persistent=true
+
+# Randomize start time by up to 30 minutes
+RandomizedDelaySec=30min
+
+[Install]
+WantedBy=timers.target

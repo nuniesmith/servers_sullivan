@@ -1,0 +1,32 @@
+[Unit]
+Description=SULLIVAN Backup Service
+Documentation=https://github.com/nuniesmith/personal_servers_sullivan
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+
+# Environment
+Environment="BACKUP_BASE_DIR=/mnt/backup/sullivan"
+Environment="RETENTION_DAYS=30"
+
+# Working directory
+WorkingDirectory=/path/to/sullivan
+
+# Execute backup script
+ExecStart=/path/to/sullivan/scripts/backup.sh
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sullivan-backup
+
+# Resource limits
+Nice=19
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target

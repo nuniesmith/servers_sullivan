@@ -1,0 +1,162 @@
+# Example Docker Compose Volume Migration
+# This shows how to update volume declarations from anonymous to bind mounts
+
+# BEFORE (Anonymous Volume):
+volumes:
+  sonarr_data:  # Docker manages this volume
+  
+services:
+  sonarr:
+    volumes:
+      - sonarr_data:/config  # Volume name
+
+# AFTER (Bind Mount):
+# Remove from volumes: section entirely (or keep only cache/temp volumes)
+
+services:
+  sonarr:
+    volumes:
+      - ./services/sonarr/config:/config  # Bind mount to local directory
+
+# =============================================================================
+# UPDATED SERVICES EXAMPLES
+# =============================================================================
+
+# Media Services - Keep cache volumes, use bind mounts for config
+  emby:
+    volumes:
+      - ./services/emby/config:/config        # CHANGED: bind mount
+      - emby_cache:/cache                      # KEEP: cache volume
+      - /tmp:/transcode                        # KEEP: temp
+
+  jellyfin:
+    volumes:
+      - ./services/jellyfin/config:/config     # CHANGED: bind mount
+      - jellyfin_cache:/cache                   # KEEP: cache volume
+      - /tmp:/transcode                        # KEEP: temp
+
+  plex:
+    volumes:
+      - ./services/plex/config:/config         # CHANGED: bind mount
+      - plex_cache:/cache                       # KEEP: cache volume
+      - /tmp:/transcode                        # KEEP: temp
+
+# Download Management - Use bind mounts for all
+  sonarr:
+    volumes:
+      - ./services/sonarr/config:/config       # CHANGED: bind mount
+      
+  radarr:
+    volumes:
+      - ./services/radarr/config:/config       # CHANGED: bind mount
+      
+  lidarr:
+    volumes:
+      - ./services/lidarr/config:/config       # CHANGED: bind mount
+      
+  qbittorrent:
+    volumes:
+      - ./services/qbittorrent/config:/config  # CHANGED: bind mount
+      
+  jackett:
+    volumes:
+      - ./services/jackett/config:/config      # CHANGED: bind mount
+
+# Books
+  calibre:
+    volumes:
+      - ./services/calibre/config:/config      # CHANGED: bind mount
+      
+  calibre-web:
+    volumes:
+      - ./services/calibre-web/config:/data    # CHANGED: bind mount (note: /data not /config)
+
+# Utilities
+  filebot-node:
+    volumes:
+      - ./services/filebot/config:/config      # CHANGED: bind mount
+      
+  ytdl_material:
+    volumes:
+      - ./services/ytdl/config:/app/appdata    # CHANGED: bind mount
+      
+  duplicati:
+    volumes:
+      - ./services/duplicati/config:/config    # CHANGED: bind mount
+      
+  mealie:
+    volumes:
+      - ./services/mealie/config:/app/data     # CHANGED: bind mount
+      
+  grocy:
+    volumes:
+      - ./services/grocy/config:/config        # CHANGED: bind mount
+      
+  syncthing:
+    volumes:
+      - ./services/syncthing/config:/config    # CHANGED: bind mount
+      
+  wiki:
+    volumes:
+      - ./services/wiki/config:/config         # CHANGED: bind mount
+
+# Portainer (if you add it to Freddy or Sullivan)
+  portainer:
+    volumes:
+      - ./services/portainer/config:/data      # CHANGED: bind mount
+
+# =============================================================================
+# UPDATED VOLUMES SECTION
+# Only keep cache volumes and important databases
+# =============================================================================
+
+volumes:
+  # Media Service caches (pruneable)
+  emby_cache:
+  jellyfin_cache:
+  plex_cache:
+  
+  # Database volumes (IMPORTANT - keep these!)
+  ytdl_mongodb:
+  wiki_postgres:
+  
+  # Remove these - now using bind mounts:
+  # emby_data:          # ❌ Remove
+  # jellyfin_data:      # ❌ Remove
+  # plex_data:          # ❌ Remove
+  # sonarr_data:        # ❌ Remove
+  # radarr_data:        # ❌ Remove
+  # lidarr_data:        # ❌ Remove
+  # jackett_data:       # ❌ Remove
+  # qbittorrent_data:   # ❌ Remove
+  # calibre_data:       # ❌ Remove
+  # calibre_web_data:   # ❌ Remove
+  # filebot_data:       # ❌ Remove
+  # ytdl_data:          # ❌ Remove (config only, DB separate)
+  # duplicati_data:     # ❌ Remove
+  # mealie_data:        # ❌ Remove
+  # grocy_data:         # ❌ Remove
+  # syncthing_data:     # ❌ Remove
+  # wiki_data:          # ❌ Remove
+  # portainer_data:     # ❌ Remove
+
+# =============================================================================
+# GITIGNORE ADDITIONS
+# =============================================================================
+
+# Add to .gitignore:
+# services/*/config/*.db
+# services/*/config/*.db-shm
+# services/*/config/*.db-wal
+# services/*/config/logs/
+# services/*/config/cache/
+# services/*/config/*.log
+# services/*/config/*.pid
+# services/*/config/transcodes/
+
+# But track config files:
+# !services/*/config/*.xml
+# !services/*/config/*.json
+# !services/*/config/*.yaml
+# !services/*/config/*.yml
+# !services/*/config/*.conf

@@ -1,0 +1,254 @@
+# SULLIVAN Staging Environment
+# Isolated Docker Compose configuration for testing changes before production
+#
+# Usage:
+#   docker compose -f docker-compose.staging.yml up -d
+#   docker compose -f docker-compose.staging.yml down
+#
+
+version: '3.8'
+
+# ============================================================================
+# Networks
+# ============================================================================
+
+networks:
+  staging-frontend:
+    name: staging-frontend
+    driver: bridge
+  staging-backend:
+    name: staging-backend
+    driver: bridge
+    internal: true
+
+# ============================================================================
+# Volumes
+# ============================================================================
+
+volumes:
+  # Staging-specific named volumes (isolated from production)
+  staging-sonarr-data:
+    name: sullivan_staging_sonarr_data
+  staging-radarr-data:
+    name: sullivan_staging_radarr_data
+  staging-lidarr-data:
+    name: sullivan_staging_lidarr_data
+  staging-prowlarr-data:
+    name: sullivan_staging_prowlarr_data
+
+# ============================================================================
+# Services
+# ============================================================================
+
+services:
+
+  # ==========================================================================
+  # Nginx Reverse Proxy (Staging)
+  # ==========================================================================
+  
+  nginx-staging:
+    image: nginx:latest
+    container_name: nginx-staging
+    restart: unless-stopped
+    ports:
+      - "8080:80"      # Staging HTTP (non-conflicting with prod port 80)
+      - "8443:443"     # Staging HTTPS (non-conflicting with prod port 443)
+    volumes:
+      # Use staging nginx configs
+      - ./services/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./services/nginx/conf.d-staging:/etc/nginx/conf.d:ro
+      # SSL certificates (can reuse from production or use self-signed)
+      - /opt/ssl/7gram.xyz:/opt/ssl/7gram.xyz:ro
+    networks:
+      - staging-frontend
+      - staging-backend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================================================
+  # Sonarr (Staging)
+  # ==========================================================================
+
+  sonarr-staging:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr-staging
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-America/New_York}
+    volumes:
+      - ./services/sonarr/config-staging:/config
+      - ${MEDIA_DIR:-/mnt/media}/tv:/tv
+      - ${DOWNLOADS_DIR:-/mnt/downloads}:/downloads
+    ports:
+      - "18989:8989"   # Staging port (non-conflicting)
+    networks:
+      - staging-frontend
+      - staging-backend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================================================
+  # Radarr (Staging)
+  # ==========================================================================
+
+  radarr-staging:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr-staging
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-America/New_York}
+    volumes:
+      - ./services/radarr/config-staging:/config
+      - ${MEDIA_DIR:-/mnt/media}/movies:/movies
+      - ${DOWNLOADS_DIR:-/mnt/downloads}:/downloads
+    ports:
+      - "17878:7878"   # Staging port (non-conflicting)
+    networks:
+      - staging-frontend
+      - staging-backend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================================================
+  # Lidarr (Staging)
+  # ==========================================================================
+
+  lidarr-staging:
+    image: lscr.io/linuxserver/lidarr:latest
+    container_name: lidarr-staging
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-America/New_York}
+    volumes:
+      - ./services/lidarr/config-staging:/config
+      - ${MEDIA_DIR:-/mnt/media}/music:/music
+      - ${DOWNLOADS_DIR:-/mnt/downloads}:/downloads
+    ports:
+      - "18686:8686"   # Staging port (non-conflicting)
+    networks:
+      - staging-frontend
+      - staging-backend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================================================
+  # Prowlarr (Staging)
+  # ==========================================================================
+
+  prowlarr-staging:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr-staging
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-America/New_York}
+    volumes:
+      - ./services/prowlarr/config-staging:/config
+    ports:
+      - "19696:9696"   # Staging port (non-conflicting)
+    networks:
+      - staging-frontend
+      - staging-backend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================================================
+  # Jellyfin (Staging) - Optional, uncomment to test
+  # ==========================================================================
+
+  # jellyfin-staging:
+  #   image: lscr.io/linuxserver/jellyfin:latest
+  #   container_name: jellyfin-staging
+  #   restart: unless-stopped
+  #   environment:
+  #     PUID: ${PUID:-1000}
+  #     PGID: ${PGID:-1000}
+  #     TZ: ${TZ:-America/New_York}
+  #   volumes:
+  #     - ./services/jellyfin/config-staging:/config
+  #     - ${MEDIA_DIR:-/mnt/media}/tv:/data/tv
+  #     - ${MEDIA_DIR:-/mnt/media}/movies:/data/movies
+  #     - ${MEDIA_DIR:-/mnt/media}/music:/data/music
+  #   ports:
+  #     - "18096:8096"   # Staging HTTP
+  #     - "18920:8920"   # Staging HTTPS
+  #   networks:
+  #     - staging-frontend
+  #     - staging-backend
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
+
+# ============================================================================
+# Notes
+# ============================================================================
+#
+# Staging Environment Characteristics:
+# - Separate networks (staging-frontend, staging-backend)
+# - Separate volumes (all prefixed with staging-)
+# - Non-conflicting ports (18989, 17878, etc. instead of 8989, 7878)
+# - Isolated configs (services/*/config-staging directories)
+# - Can run alongside production
+# - Uses same media directories (read-only testing)
+#
+# To use staging environment:
+#
+# 1. Create staging configs:
+#    mkdir -p services/sonarr/config-staging
+#    mkdir -p services/radarr/config-staging
+#    mkdir -p services/lidarr/config-staging
+#    mkdir -p services/prowlarr/config-staging
+#    mkdir -p services/nginx/conf.d-staging
+#
+# 2. Copy and modify configs for staging:
+#    cp -r services/sonarr/config/* services/sonarr/config-staging/ 2>/dev/null || true
+#    cp -r services/radarr/config/* services/radarr/config-staging/ 2>/dev/null || true
+#    cp -r services/nginx/conf.d/* services/nginx/conf.d-staging/
+#    # Update nginx configs to proxy to staging ports (18989, 17878, etc.)
+#
+# 3. Create .env.staging file:
+#    cp .env .env.staging
+#    # Update with staging-specific settings if needed
+#
+# 4. Start staging environment:
+#    docker compose -f docker-compose.staging.yml --env-file .env.staging up -d
+#
+# 5. Access staging services:
+#    - Sonarr: http://localhost:18989
+#    - Radarr: http://localhost:17878
+#    - Lidarr: http://localhost:18686
+#    - Prowlarr: http://localhost:19696
+#
+# 6. Test changes in staging, then apply to production
+#
+# 7. Stop staging environment:
+#    docker compose -f docker-compose.staging.yml down
+#
+# IMPORTANT: Staging *arr apps share media directories with production.
+# Be careful when testing download/import operations. Consider using
+# a separate test downloads directory for staging.
+#

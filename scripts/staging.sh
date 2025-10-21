@@ -1,0 +1,375 @@
+#!/bin/bash
+#
+# Staging Environment Manager for SULLIVAN
+# Helper script to manage staging environment lifecycle
+#
+# Usage: ./staging.sh [command]
+#
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+COMPOSE_FILE="$PROJECT_DIR/docker-compose.staging.yml"
+ENV_FILE="$PROJECT_DIR/.env.staging"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+log() {
+    echo -e "${GREEN}[$(date +'%H:%M:%S')]${NC} $1"
+}
+
+error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+# ============================================================================
+# Commands
+# ============================================================================
+
+setup_staging() {
+    log "Setting up staging environment..."
+    
+    # Create staging config directories
+    info "Creating staging config directories..."
+    mkdir -p "$PROJECT_DIR/services/sonarr/config-staging"
+    mkdir -p "$PROJECT_DIR/services/radarr/config-staging"
+    mkdir -p "$PROJECT_DIR/services/lidarr/config-staging"
+    mkdir -p "$PROJECT_DIR/services/prowlarr/config-staging"
+    mkdir -p "$PROJECT_DIR/services/jellyfin/config-staging"
+    mkdir -p "$PROJECT_DIR/services/nginx/conf.d-staging"
+    
+    # Copy production configs to staging (if they exist)
+    info "Copying configs to staging..."
+    for app in sonarr radarr lidarr prowlarr jellyfin; do
+        if [[ -d "$PROJECT_DIR/services/$app/config" ]]; then
+            cp -r "$PROJECT_DIR/services/$app/config"/* "$PROJECT_DIR/services/$app/config-staging/" 2>/dev/null || true
+        fi
+    done
+    
+    if [[ -d "$PROJECT_DIR/services/nginx/conf.d" ]]; then
+        cp -r "$PROJECT_DIR/services/nginx/conf.d"/* "$PROJECT_DIR/services/nginx/conf.d-staging/" 2>/dev/null || true
+        
+        # Update nginx configs for staging ports
+        find "$PROJECT_DIR/services/nginx/conf.d-staging" -type f -name "*.conf" -exec \
+            sed -i \
+                -e 's/:8989/:18989/g' \
+                -e 's/:7878/:17878/g' \
+                -e 's/:8686/:18686/g' \
+                -e 's/:9696/:19696/g' \
+                -e 's/proxy_pass http:\/\/sonarr:8989/proxy_pass http:\/\/sonarr-staging:8989/g' \
+                -e 's/proxy_pass http:\/\/radarr:7878/proxy_pass http:\/\/radarr-staging:7878/g' \
+                -e 's/proxy_pass http:\/\/lidarr:8686/proxy_pass http:\/\/lidarr-staging:8686/g' \
+                -e 's/proxy_pass http:\/\/prowlarr:9696/proxy_pass http:\/\/prowlarr-staging:9696/g' \
+            {} \;
+    fi
+    
+    # Create .env.staging if it doesn't exist
+    if [[ ! -f "$ENV_FILE" ]]; then
+        info "Creating .env.staging..."
+        if [[ -f "$PROJECT_DIR/.env" ]]; then
+            cp "$PROJECT_DIR/.env" "$ENV_FILE"
+        else
+            cat > "$ENV_FILE" << 'EOF'
+# Staging Environment Variables
+PUID=1000
+PGID=1000
+TZ=America/New_York
+
+# Media directories (shared with production for read-only testing)
+MEDIA_DIR=/mnt/media
+DOWNLOADS_DIR=/mnt/downloads/staging  # Use separate staging downloads
+EOF
+        fi
+    fi
+    
+    log "✓ Staging environment setup complete"
+    echo ""
+    info "Next steps:"
+    echo "  1. Review and update .env.staging if needed"
+    echo "  2. Start staging: ./scripts/staging.sh start"
+    echo "  3. Access staging services:"
+    echo "     - Sonarr: http://localhost:18989"
+    echo "     - Radarr: http://localhost:17878"
+    echo "     - Lidarr: http://localhost:18686"
+    echo "     - Prowlarr: http://localhost:19696"
+}
+
+start_staging() {
+    log "Starting staging environment..."
+    
+    if [[ ! -f "$ENV_FILE" ]]; then
+        error ".env.staging not found. Run: ./scripts/staging.sh setup"
+        exit 1
+    fi
+    
+    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d
+    
+    log "✓ Staging environment started"
+    echo ""
+    info "Access staging services:"
+    echo "  - Sonarr: http://localhost:18989"
+    echo "  - Radarr: http://localhost:17878"
+    echo "  - Lidarr: http://localhost:18686"
+    echo "  - Prowlarr: http://localhost:19696"
+    echo ""
+    info "View logs: ./scripts/staging.sh logs"
+}
+
+stop_staging() {
+    log "Stopping staging environment..."
+    docker compose -f "$COMPOSE_FILE" stop
+    log "✓ Staging environment stopped"
+}
+
+restart_staging() {
+    log "Restarting staging environment..."
+    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" restart
+    log "✓ Staging environment restarted"
+}
+
+down_staging() {
+    warn "This will stop and remove staging containers (data will be preserved)"
+    read -p "Continue? (y/N): " -r
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        log "Removing staging environment..."
+        docker compose -f "$COMPOSE_FILE" down
+        log "✓ Staging environment removed"
+    else
+        info "Cancelled"
+    fi
+}
+
+destroy_staging() {
+    error "⚠️  WARNING: This will delete ALL staging data (configs, databases, volumes)"
+    warn "This action cannot be undone!"
+    echo ""
+    read -p "Type 'destroy staging' to confirm: " -r
+    if [[ $REPLY == "destroy staging" ]]; then
+        log "Destroying staging environment..."
+        docker compose -f "$COMPOSE_FILE" down -v
+        rm -rf "$PROJECT_DIR/services/sonarr/config-staging"
+        rm -rf "$PROJECT_DIR/services/radarr/config-staging"
+        rm -rf "$PROJECT_DIR/services/lidarr/config-staging"
+        rm -rf "$PROJECT_DIR/services/prowlarr/config-staging"
+        rm -rf "$PROJECT_DIR/services/jellyfin/config-staging"
+        rm -rf "$PROJECT_DIR/services/nginx/conf.d-staging"
+        log "✓ Staging environment destroyed"
+    else
+        info "Cancelled"
+    fi
+}
+
+status_staging() {
+    log "Staging environment status:"
+    echo ""
+    docker compose -f "$COMPOSE_FILE" ps
+}
+
+logs_staging() {
+    local service="$1"
+    if [[ -z "$service" ]]; then
+        docker compose -f "$COMPOSE_FILE" logs -f --tail=100
+    else
+        docker compose -f "$COMPOSE_FILE" logs -f --tail=100 "$service"
+    fi
+}
+
+sync_to_staging() {
+    log "Syncing production configs to staging..."
+    
+    warn "This will overwrite staging configs with production configs"
+    read -p "Continue? (y/N): " -r
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        info "Cancelled"
+        exit 0
+    fi
+    
+    # Sync app configs
+    for app in sonarr radarr lidarr prowlarr jellyfin; do
+        if [[ -d "$PROJECT_DIR/services/$app/config" ]]; then
+            info "Syncing $app configs..."
+            rsync -av --delete \
+                "$PROJECT_DIR/services/$app/config/" \
+                "$PROJECT_DIR/services/$app/config-staging/"
+        fi
+    done
+    
+    # Sync nginx configs
+    if [[ -d "$PROJECT_DIR/services/nginx/conf.d" ]]; then
+        info "Syncing nginx configs..."
+        rsync -av --delete \
+            "$PROJECT_DIR/services/nginx/conf.d/" \
+            "$PROJECT_DIR/services/nginx/conf.d-staging/"
+        
+        # Update nginx configs for staging
+        find "$PROJECT_DIR/services/nginx/conf.d-staging" -type f -name "*.conf" -exec \
+            sed -i \
+                -e 's/proxy_pass http:\/\/sonarr:8989/proxy_pass http:\/\/sonarr-staging:8989/g' \
+                -e 's/proxy_pass http:\/\/radarr:7878/proxy_pass http:\/\/radarr-staging:7878/g' \
+                -e 's/proxy_pass http:\/\/lidarr:8686/proxy_pass http:\/\/lidarr-staging:8686/g' \
+                -e 's/proxy_pass http:\/\/prowlarr:9696/proxy_pass http:\/\/prowlarr-staging:9696/g' \
+            {} \;
+    fi
+    
+    log "✓ Configs synced to staging"
+    info "Remember to restart staging: ./scripts/staging.sh restart"
+}
+
+sync_to_production() {
+    error "⚠️  WARNING: This will overwrite production configs with staging configs"
+    warn "Make sure you've tested staging configs thoroughly!"
+    echo ""
+    read -p "Type 'sync to production' to confirm: " -r
+    if [[ $REPLY != "sync to production" ]]; then
+        info "Cancelled"
+        exit 0
+    fi
+    
+    log "Syncing staging configs to production..."
+    
+    # Backup production configs
+    local backup_dir="$PROJECT_DIR/backups/configs-$(date +%Y%m%d_%H%M%S)"
+    mkdir -p "$backup_dir"
+    for app in sonarr radarr lidarr prowlarr jellyfin nginx; do
+        if [[ -d "$PROJECT_DIR/services/$app/config" ]]; then
+            cp -r "$PROJECT_DIR/services/$app/config" "$backup_dir/$app/" 2>/dev/null || true
+        fi
+    done
+    info "Production configs backed up to: $backup_dir"
+    
+    # Sync app configs
+    for app in sonarr radarr lidarr prowlarr jellyfin; do
+        if [[ -d "$PROJECT_DIR/services/$app/config-staging" ]]; then
+            info "Syncing $app configs..."
+            rsync -av --delete \
+                "$PROJECT_DIR/services/$app/config-staging/" \
+                "$PROJECT_DIR/services/$app/config/"
+        fi
+    done
+    
+    # Sync nginx configs
+    if [[ -d "$PROJECT_DIR/services/nginx/conf.d-staging" ]]; then
+        info "Syncing nginx configs..."
+        rsync -av --delete \
+            "$PROJECT_DIR/services/nginx/conf.d-staging/" \
+            "$PROJECT_DIR/services/nginx/conf.d/"
+        
+        # Update nginx configs for production
+        find "$PROJECT_DIR/services/nginx/conf.d" -type f -name "*.conf" -exec \
+            sed -i \
+                -e 's/proxy_pass http:\/\/sonarr-staging:8989/proxy_pass http:\/\/sonarr:8989/g' \
+                -e 's/proxy_pass http:\/\/radarr-staging:7878/proxy_pass http:\/\/radarr:7878/g' \
+                -e 's/proxy_pass http:\/\/lidarr-staging:8686/proxy_pass http:\/\/lidarr:8686/g' \
+                -e 's/proxy_pass http:\/\/prowlarr-staging:9696/proxy_pass http:\/\/prowlarr:9696/g' \
+            {} \;
+    fi
+    
+    log "✓ Configs synced to production"
+    warn "Remember to restart production services!"
+    echo "  docker compose restart"
+}
+
+usage() {
+    cat << EOF
+Staging Environment Manager for SULLIVAN
+
+Usage: $0 [command]
+
+Commands:
+    setup       Set up staging environment (create directories, copy configs)
+    start       Start staging environment
+    stop        Stop staging environment
+    restart     Restart staging environment
+    down        Stop and remove staging containers (preserve data)
+    destroy     Destroy staging environment (delete all data)
+    status      Show staging container status
+    logs        View staging logs (optional: specify service name)
+    
+    sync-to-staging     Sync production configs to staging
+    sync-to-prod        Sync staging configs to production (with backup)
+    
+    help        Show this help message
+
+Examples:
+    # Initial setup
+    $0 setup
+    $0 start
+    
+    # View logs
+    $0 logs
+    $0 logs sonarr-staging
+    
+    # Test configuration changes
+    $0 sync-to-staging    # Production -> Staging
+    # Make changes in staging configs
+    $0 restart
+    # Test changes
+    $0 sync-to-prod       # Staging -> Production (after testing)
+    
+    # Cleanup
+    $0 stop
+    $0 down
+    $0 destroy            # Complete removal
+
+EOF
+}
+
+# ============================================================================
+# Main
+# ============================================================================
+
+case "${1:-help}" in
+    setup)
+        setup_staging
+        ;;
+    start)
+        start_staging
+        ;;
+    stop)
+        stop_staging
+        ;;
+    restart)
+        restart_staging
+        ;;
+    down)
+        down_staging
+        ;;
+    destroy)
+        destroy_staging
+        ;;
+    status)
+        status_staging
+        ;;
+    logs)
+        logs_staging "$2"
+        ;;
+    sync-to-staging)
+        sync_to_staging
+        ;;
+    sync-to-prod|sync-to-production)
+        sync_to_production
+        ;;
+    help|--help|-h)
+        usage
+        ;;
+    *)
+        error "Unknown command: $1"
+        echo ""
+        usage
+        exit 1
+        ;;
+esac

@@ -1,0 +1,80 @@
+# =============================================================================
+# Services Directory .gitignore
+# Track configuration files, ignore runtime data
+# =============================================================================
+
+# Database files (large and regenerated)
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/*.sqlite
+**/*.sqlite-shm
+**/*.sqlite-wal
+
+# Log files
+**/logs/
+**/*.log
+**/*.log.*
+
+# Cache directories
+**/cache/
+**/Cache/
+**/.cache/
+
+# Temporary files
+**/tmp/
+**/temp/
+**/*.tmp
+**/*.pid
+**/*.lock
+
+# Transcode directories
+**/transcodes/
+**/transcode/
+
+# Session files
+**/sessions/
+**/*.session
+
+# Backup files
+**/*.bak
+**/*.backup
+**/*.old
+
+# Media server specific
+emby/config/cache/
+emby/config/transcoding-temp/
+emby/config/metadata/
+jellyfin/config/cache/
+jellyfin/config/transcodes/
+jellyfin/config/metadata/
+plex/config/Cache/
+plex/config/Logs/
+plex/config/Crash Reports/
+plex/config/Diagnostics/
+
+# Download manager specific
+qbittorrent/config/*.fastresume
+qbittorrent/config/BT_backup/
+radarr/config/MediaCover/
+sonarr/config/MediaCover/
+lidarr/config/MediaCover/
+
+# Database dumps (if generated)
+**/*.dump
+**/*.sql
+
+# But INCLUDE important config files
+!**/*.xml
+!**/*.json
+!**/*.yaml
+!**/*.yml
+!**/*.conf
+!**/*.config
+!**/*.toml
+!**/*.ini
+!**/*.properties
+!**/*.env.example
+
+# Keep directory structure
+!**/.gitkeep
