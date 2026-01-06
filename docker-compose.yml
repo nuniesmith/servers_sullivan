@@ -67,14 +67,14 @@ services:
   emby:
     image: emby/embyserver
     container_name: emby
-    runtime: runc
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [compute, utility, video]
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [compute, utility, video]
     environment:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
@@ -154,14 +154,14 @@ services:
   plex:
     image: lscr.io/linuxserver/plex:latest
     container_name: plex
-    runtime: runc
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [compute, utility, video]
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [compute, utility, video]
     environment:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
