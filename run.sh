@@ -66,7 +66,7 @@ log() {
         WARN)  echo -e "${YELLOW}[$timestamp WARN]${NC} $*" ;;
         ERROR) echo -e "${RED}[$timestamp ERROR]${NC} $*" ;;
         DEBUG) echo -e "${BLUE}[$timestamp DEBUG]${NC} $*" ;;
-        HEADER) 
+        HEADER)
             echo ""
             echo -e "${BOLD}${CYAN}=== $* ===${NC}"
             echo ""
@@ -96,17 +96,17 @@ detect_environment() {
 
 check_prerequisites() {
     log INFO "Checking prerequisites..."
-    
+
     if ! command -v docker >/dev/null 2>&1; then
         log ERROR "Docker is not installed"
         exit 1
     fi
-    
+
     if ! docker info >/dev/null 2>&1; then
         log ERROR "Docker daemon is not running"
         exit 1
     fi
-    
+
     if command -v docker-compose >/dev/null 2>&1; then
         COMPOSE_CMD="docker-compose"
     elif docker compose version >/dev/null 2>&1; then
@@ -115,7 +115,7 @@ check_prerequisites() {
         log ERROR "Docker Compose is not available"
         exit 1
     fi
-    
+
     log INFO "Docker: $(docker --version | cut -d' ' -f3 | tr -d ',')"
     log INFO "Compose: $($COMPOSE_CMD version --short 2>/dev/null || $COMPOSE_CMD version | head -1)"
 }
@@ -126,7 +126,7 @@ check_prerequisites() {
 
 setup_networks() {
     log INFO "Setting up Docker networks..."
-    
+
     for network in "${SULLIVAN_NETWORKS[@]}"; do
         if ! docker network inspect "$network" >/dev/null 2>&1; then
             log INFO "Creating network: $network"
@@ -137,20 +137,20 @@ setup_networks() {
             log DEBUG "Network $network already exists"
         fi
     done
-    
+
     log INFO "Docker networks ready"
 }
 
 cleanup_networks() {
     log INFO "Cleaning up unused Docker networks..."
-    
+
     # Remove Sullivan-specific networks if they're not in use
     for network in "${SULLIVAN_NETWORKS[@]}"; do
         if docker network inspect "$network" >/dev/null 2>&1; then
             # Check if any containers are using this network
             local containers
             containers=$(docker network inspect "$network" --format '{{range .Containers}}{{.Name}} {{end}}' 2>/dev/null || echo "")
-            
+
             if [[ -z "$containers" ]]; then
                 log INFO "Removing unused network: $network"
                 docker network rm "$network" >/dev/null 2>&1 || true
@@ -159,7 +159,7 @@ cleanup_networks() {
             fi
         fi
     done
-    
+
     # Prune any dangling networks
     docker network prune -f >/dev/null 2>&1 || true
     log INFO "Network cleanup complete"
@@ -171,17 +171,17 @@ cleanup_networks() {
 
 cleanup_orphans() {
     log INFO "Cleaning up orphan containers..."
-    
+
     local cmd_args
     cmd_args=$(build_compose_cmd)
-    
+
     # Remove orphan containers from compose
     $COMPOSE_CMD $cmd_args down --remove-orphans 2>/dev/null || true
-    
+
     # Find and remove any stopped containers with sullivan-related names
     local orphans
     orphans=$(docker ps -a --filter "status=exited" --filter "status=dead" --format "{{.Names}}" | grep -E "sullivan|emby|jellyfin|plex|sonarr|radarr|lidarr|qbittorrent|jackett|calibre|mealie|grocy|wiki|syncthing|duplicati|watchtower|ytdl|filebot|doplarr|unpackerr|flaresolverr" || true)
-    
+
     if [[ -n "$orphans" ]]; then
         log INFO "Removing orphan containers:"
         for container in $orphans; do
@@ -189,7 +189,7 @@ cleanup_orphans() {
             docker rm -f "$container" 2>/dev/null || true
         done
     fi
-    
+
     log INFO "Orphan cleanup complete"
 }
 
@@ -207,18 +207,18 @@ cleanup_images() {
 
 full_cleanup() {
     log HEADER "Full Docker Cleanup"
-    
+
     cleanup_orphans
     cleanup_networks
     cleanup_volumes
     cleanup_images
-    
+
     # Docker system prune (careful - removes all unused data)
     log INFO "Running Docker system prune..."
     docker system prune -f >/dev/null 2>&1 || true
-    
+
     log INFO "Full cleanup complete"
-    
+
     # Show disk usage
     echo ""
     log INFO "Docker disk usage:"
@@ -242,12 +242,12 @@ build_compose_cmd() {
     local env_file
     compose_file=$(get_compose_file)
     env_file=$(get_env_file)
-    
+
     local cmd="-f $compose_file"
     if [[ -f "$env_file" ]]; then
         cmd="$cmd --env-file $env_file"
     fi
-    
+
     echo "$cmd"
 }
 
@@ -276,16 +276,16 @@ update_env_var() {
     local env_file="$1"
     local var_name="$2"
     local var_value="$3"
-    
+
     local current_value
     current_value=$(grep "^${var_name}=" "$env_file" 2>/dev/null | cut -d'=' -f2- || echo "")
-    
+
     # Skip if already has a real value (not a placeholder)
     if [[ -n "$current_value" && "$current_value" != "your_"* && "$current_value" != "changeme_"* && "$current_value" != "COPY_FROM_"* && "$current_value" != "PLACEHOLDER_"* ]]; then
         log DEBUG "$var_name already configured, skipping"
         return
     fi
-    
+
     if grep -q "^${var_name}=" "$env_file" 2>/dev/null; then
         sed -i "s|^${var_name}=.*|${var_name}=${var_value}|" "$env_file"
     else
@@ -297,27 +297,27 @@ update_env_var() {
 generate_secrets() {
     local env_file
     env_file=$(get_env_file)
-    
+
     if [[ ! -f "$env_file" ]]; then
         log ERROR ".env file not found. Run './run.sh start' first to create it."
         return 1
     fi
-    
+
     log HEADER "Generating Secrets"
-    
+
     # Backup existing .env
     cp "$env_file" "$env_file.bak.$(date +%Y%m%d_%H%M%S)"
-    
+
     # Generate database passwords
     update_env_var "$env_file" "WIKI_DB_PASSWORD" "$(generate_password)"
     update_env_var "$env_file" "MEALIE_DB_PASSWORD" "$(generate_password)"
     update_env_var "$env_file" "FILEBOT_PASSWORD" "$(generate_password)"
-    
+
     # Set API key placeholders
     update_env_var "$env_file" "SONARR_API_KEY" "COPY_FROM_SONARR_SETTINGS_AFTER_STARTUP"
     update_env_var "$env_file" "RADARR_API_KEY" "COPY_FROM_RADARR_SETTINGS_AFTER_STARTUP"
     update_env_var "$env_file" "LIDARR_API_KEY" "COPY_FROM_LIDARR_SETTINGS_AFTER_STARTUP"
-    
+
     log INFO "Secrets generated!"
     echo ""
     log WARN "NOTE: ARR API keys must be copied manually after startup:"
@@ -333,14 +333,14 @@ generate_secrets() {
 create_env_file() {
     local env_file
     env_file=$(get_env_file)
-    
+
     if [[ -f "$env_file" ]]; then
         log INFO ".env file exists"
         return 0
     fi
 
     log INFO "Creating .env file..."
-    
+
     cat > "$env_file" <<'EOF'
 # =============================================================================
 # SULLIVAN - Environment Configuration
@@ -406,7 +406,7 @@ EOF
 
     log INFO ".env file created at $env_file"
     log WARN "Please review and update the configuration!"
-    
+
     # Generate initial secrets
     generate_secrets
 }
@@ -417,14 +417,14 @@ EOF
 
 create_directories() {
     log INFO "Checking media directories..."
-    
+
     local env_file
     env_file=$(get_env_file)
-    
+
     if [[ -f "$env_file" ]]; then
         source "$env_file"
     fi
-    
+
     local dirs=(
         "${MEDIA_PATH:-/mnt/media}"
         "${MEDIA_PATH_MOVIES:-/mnt/media/movies}"
@@ -444,16 +444,19 @@ create_directories() {
                 log INFO "Created: $dir"
             else
                 log WARN "Cannot create: $dir (check permissions)"
-                ((missing++))
+                missing=$((missing + 1))
             fi
         fi
     done
 
     if [[ $missing -gt 0 ]]; then
-        log WARN "$missing directories could not be created"
+        log WARN "$missing directories could not be created - ensure they exist on the host"
+        log WARN "Continuing anyway (directories may already exist or be mounted)..."
     else
         log INFO "All media directories ready"
     fi
+    # Don't fail on missing directories - they may be pre-existing mounts
+    return 0
 }
 
 # =============================================================================
@@ -463,36 +466,36 @@ create_directories() {
 pull_images() {
     local services=("$@")
     log HEADER "Pulling Docker Images"
-    
+
     local cmd_args
     cmd_args=$(build_compose_cmd)
-    
+
     if [[ ${#services[@]} -eq 0 || "${services[*]}" == "all" ]]; then
         $COMPOSE_CMD $cmd_args pull --ignore-pull-failures 2>&1 | grep -v "Pulling" || true
     else
         $COMPOSE_CMD $cmd_args pull --ignore-pull-failures "${services[@]}" 2>&1 | grep -v "Pulling" || true
     fi
-    
+
     log INFO "Image pull complete"
 }
 
 start_services() {
     local services=("$@")
-    
+
     log HEADER "Starting Sullivan Services"
-    
+
     # Setup
     create_env_file
     setup_networks
     create_directories
-    
+
     local cmd_args
     cmd_args=$(build_compose_cmd)
-    
+
     # Clean orphans first
     log INFO "Cleaning up before start..."
     $COMPOSE_CMD $cmd_args down --remove-orphans 2>/dev/null || true
-    
+
     # Start services
     if [[ ${#services[@]} -eq 0 || "${services[*]}" == "all" ]]; then
         log INFO "Starting all services..."
@@ -501,22 +504,22 @@ start_services() {
         log INFO "Starting services: ${services[*]}"
         $COMPOSE_CMD $cmd_args up -d "${services[@]}"
     fi
-    
+
     log INFO "Waiting for services to initialize..."
     sleep 5
-    
+
     show_status
     show_endpoints
 }
 
 stop_services() {
     local services=("$@")
-    
+
     log HEADER "Stopping Sullivan Services"
-    
+
     local cmd_args
     cmd_args=$(build_compose_cmd)
-    
+
     if [[ ${#services[@]} -eq 0 || "${services[*]}" == "all" ]]; then
         log INFO "Stopping all services..."
         $COMPOSE_CMD $cmd_args down --remove-orphans
@@ -525,18 +528,18 @@ stop_services() {
         log INFO "Stopping services: ${services[*]}"
         $COMPOSE_CMD $cmd_args stop "${services[@]}"
     fi
-    
+
     log INFO "Services stopped"
 }
 
 restart_services() {
     local services=("$@")
-    
+
     log HEADER "Restarting Sullivan Services"
-    
+
     local cmd_args
     cmd_args=$(build_compose_cmd)
-    
+
     if [[ ${#services[@]} -eq 0 || "${services[*]}" == "all" ]]; then
         log INFO "Restarting all services..."
         $COMPOSE_CMD $cmd_args restart
@@ -544,20 +547,20 @@ restart_services() {
         log INFO "Restarting services: ${services[*]}"
         $COMPOSE_CMD $cmd_args restart "${services[@]}"
     fi
-    
+
     sleep 3
     show_status
 }
 
 rebuild_services() {
     local services=("$@")
-    
+
     log HEADER "Rebuilding Sullivan Services"
     log INFO "This will stop, pull new images, and restart services"
-    
+
     local cmd_args
     cmd_args=$(build_compose_cmd)
-    
+
     # Stop services
     if [[ ${#services[@]} -eq 0 || "${services[*]}" == "all" ]]; then
         log INFO "Stopping all services..."
@@ -566,17 +569,17 @@ rebuild_services() {
         log INFO "Stopping services: ${services[*]}"
         $COMPOSE_CMD $cmd_args stop "${services[@]}"
     fi
-    
+
     # Cleanup
     cleanup_orphans
     cleanup_images
-    
+
     # Setup networks
     setup_networks
-    
+
     # Pull fresh images
     pull_images "${services[@]}"
-    
+
     # Start services
     if [[ ${#services[@]} -eq 0 || "${services[*]}" == "all" ]]; then
         log INFO "Starting all services..."
@@ -585,10 +588,10 @@ rebuild_services() {
         log INFO "Starting services: ${services[*]}"
         $COMPOSE_CMD $cmd_args up -d "${services[@]}"
     fi
-    
+
     log INFO "Waiting for services to initialize..."
     sleep 5
-    
+
     show_status
     show_endpoints
 }
@@ -599,20 +602,20 @@ rebuild_services() {
 
 show_status() {
     log HEADER "Service Status"
-    
+
     local cmd_args
     cmd_args=$(build_compose_cmd)
-    
+
     $COMPOSE_CMD $cmd_args ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || \
     $COMPOSE_CMD $cmd_args ps
 }
 
 show_logs() {
     local services=("$@")
-    
+
     local cmd_args
     cmd_args=$(build_compose_cmd)
-    
+
     if [[ ${#services[@]} -eq 0 || "${services[*]}" == "all" ]]; then
         $COMPOSE_CMD $cmd_args logs -f --tail=100
     else
@@ -622,29 +625,29 @@ show_logs() {
 
 health_check() {
     log HEADER "Health Check"
-    
+
     local cmd_args
     cmd_args=$(build_compose_cmd)
-    
+
     # Get all running containers
     local containers
     containers=$($COMPOSE_CMD $cmd_args ps -q 2>/dev/null || echo "")
-    
+
     if [[ -z "$containers" ]]; then
         log WARN "No containers running"
         return 1
     fi
-    
+
     local healthy=0
     local unhealthy=0
     local no_check=0
-    
+
     for container_id in $containers; do
         local name
         local health
         name=$(docker inspect --format='{{.Name}}' "$container_id" | sed 's/^\///')
         health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id" 2>/dev/null || echo "unknown")
-        
+
         case "$health" in
             healthy)
                 echo -e "  ${GREEN}✓${NC} $name: healthy"
@@ -674,17 +677,17 @@ health_check() {
                 ;;
         esac
     done
-    
+
     echo ""
     log INFO "Summary: $healthy healthy, $unhealthy unhealthy, $no_check other"
-    
+
     [[ $unhealthy -eq 0 ]]
 }
 
 show_endpoints() {
     echo ""
     log HEADER "Service Endpoints"
-    
+
     echo "Media Servers:"
     echo "  Emby:            http://localhost:8096"
     echo "  Jellyfin:        http://localhost:8097"
@@ -713,19 +716,19 @@ show_endpoints() {
 
 show_info() {
     log HEADER "System Information"
-    
+
     echo "Environment: $(detect_environment)"
     echo "Hostname:    $(hostname)"
     echo "User:        $USER"
     echo "Docker:      $(docker --version | cut -d' ' -f3 | tr -d ',')"
     echo "Compose:     $($COMPOSE_CMD version --short 2>/dev/null || echo 'unknown')"
-    
+
     if command -v free >/dev/null 2>&1; then
         echo "Memory:      $(free -h | awk '/^Mem:/{print $2}') total, $(free -h | awk '/^Mem:/{print $7}') available"
     fi
-    
+
     echo "Disk:        $(df -h / | awk 'NR==2{print $4}') available on /"
-    
+
     echo ""
     log INFO "Docker disk usage:"
     docker system df 2>/dev/null || true
@@ -758,7 +761,7 @@ ${BOLD}Commands:${NC}
 
 ${BOLD}Services:${NC}
     Specify service names to target specific services, or omit for all.
-    
+
     Media:      emby, jellyfin, plex
     Downloads:  qbittorrent, jackett, sonarr, radarr, lidarr, flaresolverr
     Books:      calibre, calibre-web
@@ -790,17 +793,17 @@ main() {
         usage
         exit 1
     fi
-    
+
     # Get command
     local command="$1"
     shift
-    
+
     # Remaining args are services
     local services=("$@")
-    
+
     # Change to project directory
     cd "$PROJECT_ROOT"
-    
+
     # Check prerequisites for most commands
     case "$command" in
         help|-h|--help)
@@ -811,7 +814,7 @@ main() {
             check_prerequisites
             ;;
     esac
-    
+
     # Execute command
     case "$command" in
         start)
