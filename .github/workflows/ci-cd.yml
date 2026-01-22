@@ -259,8 +259,8 @@ jobs:
                         echo "  ✓ Lidarr API key configured"
                       fi
                       if [ -n "$DISCORD_KEY" ] && [ "$DISCORD_KEY" != "" ]; then
-                        sed -i "s|^DISCORD_TOKEN=.*|DISCORD_TOKEN=${DISCORD_KEY}|" .env
-                        echo "  ✓ Discord token configured"
+                        sed -i "s|^DOPLARR_TOKEN=.*|DOPLARR_TOKEN=${DISCORD_KEY}|" .env
+                        echo "  ✓ Doplarr token configured"
                       fi
 
                   deploy-command: |
