@@ -184,8 +184,8 @@ jobs:
                         docker compose pull --ignore-pull-failures 2>&1 || true
                         echo "🐳 Stopping existing services..."
                         ./run.sh stop 2>/dev/null || true
-                        echo "🐳 Starting services in production mode..."
-                        ./run.sh start prod 2>&1
+                        echo "🐳 Starting all services..."
+                        ./run.sh start 2>&1
                       else
                         echo "⚠️ run.sh not found, using docker compose directly"
                         docker compose pull --ignore-pull-failures

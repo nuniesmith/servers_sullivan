@@ -366,9 +366,9 @@ MEDIA_PATH_BOOKS=/mnt/media/books
 MEDIA_PATH_AUDIOBOOKS=/mnt/media/books/audiobooks
 MEDIA_PATH_EBOOKS=/mnt/media/ebooks
 
-# Download Paths
-DOWNLOAD_PATH_COMPLETE=/mnt/media/qbittorrent/complete
-DOWNLOAD_PATH_INCOMPLETE=/mnt/media/qbittorrent/incomplete
+# Download Paths (OS drive for fast I/O, *arr apps move to /mnt/media after processing)
+DOWNLOAD_PATH_COMPLETE=/media/qbittorrent/complete
+DOWNLOAD_PATH_INCOMPLETE=/media/qbittorrent/incomplete
 
 # YouTube Paths
 YOUTUBE_AUDIO_PATH=/mnt/media/youtube/audio
@@ -431,8 +431,8 @@ create_directories() {
         "${MEDIA_PATH_SHOWS:-/mnt/media/shows}"
         "${MEDIA_PATH_MUSIC:-/mnt/media/music}"
         "${MEDIA_PATH_BOOKS:-/mnt/media/books}"
-        "${DOWNLOAD_PATH_COMPLETE:-/mnt/media/qbittorrent/complete}"
-        "${DOWNLOAD_PATH_INCOMPLETE:-/mnt/media/qbittorrent/incomplete}"
+        "${DOWNLOAD_PATH_COMPLETE:-/media/qbittorrent/complete}"
+        "${DOWNLOAD_PATH_INCOMPLETE:-/media/qbittorrent/incomplete}"
         "${YOUTUBE_AUDIO_PATH:-/mnt/media/youtube/audio}"
         "${YOUTUBE_VIDEO_PATH:-/mnt/media/youtube/video}"
     )

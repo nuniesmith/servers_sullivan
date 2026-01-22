@@ -3,766 +3,772 @@
 
 # Named volumes for data/cache/databases only
 volumes:
+    # Media Service volumes
+    emby_data:
+    emby_cache:
+    jellyfin_data:
+    jellyfin_cache:
+    plex_data:
+    plex_cache:
+    calibre_data:
+    calibre_web_data:
 
-  # Media Service volumes
-  emby_data:
-  emby_cache:
-  jellyfin_data:
-  jellyfin_cache:
-  plex_data:
-  plex_cache:
-  calibre_data:
-  calibre_web_data:
-  
-  # Download Management volumes
-  sonarr_data:
-  radarr_data:
-  lidarr_data:
-  jackett_data:
-  qbittorrent_data:
-  
-  # Utility volumes
-  filebot_data:
-  homarr_data:
-  duplicati_data:
-  ytdl_data:
-  mealie_data:
-  grocy_data:
-  portainer_data:
-  syncthing_data:
-  nextcloud_data:
-  wiki_data:
-  
-  # Database volumes
-  ytdl_mongodb:
-  nextcloud_mysql:
-  wiki_postgres:
-  
-  # Monitoring/System volumes
-  watchtower_data:
-  datadog_data:
+    # Download Management volumes
+    sonarr_data:
+    radarr_data:
+    lidarr_data:
+    jackett_data:
+    qbittorrent_data:
+
+    # Utility volumes
+    filebot_data:
+    homarr_data:
+    duplicati_data:
+    ytdl_data:
+    mealie_data:
+    grocy_data:
+    portainer_data:
+    syncthing_data:
+    nextcloud_data:
+    wiki_data:
+
+    # Database volumes
+    ytdl_mongodb:
+    nextcloud_mysql:
+    wiki_postgres:
+
+    # Monitoring/System volumes
+    watchtower_data:
+    datadog_data:
 
 # Custom networks for service isolation
 networks:
-  frontend:
-    driver: bridge
-  media:
-    driver: bridge
-  download:
-    driver: bridge
-  books:
-    driver: bridge
-  database:
-    driver: bridge
-  monitoring:
-    driver: bridge
-  utilities:
-    driver: bridge
+    frontend:
+        driver: bridge
+    media:
+        driver: bridge
+    download:
+        driver: bridge
+    books:
+        driver: bridge
+    database:
+        driver: bridge
+    monitoring:
+        driver: bridge
+    utilities:
+        driver: bridge
 
 services:
-  # =============================================================================
-  # MEDIA SERVICES
-  # =============================================================================
-  # emby
-  emby:
-    image: emby/embyserver
-    container_name: emby
-    runtime: nvidia
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [compute, utility, video]
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-America/Toronto}
-      - LIBVA_DRIVER_NAME=${LIBVA_DRIVER_NAME:-iHD}
-    volumes:
-      # DATA: Database, metadata, cache
-      - emby_data:/config
-      - emby_cache:/cache
-      # TRANSCODE: Temporary
-      - /tmp:/transcode
-      # MEDIA: media files
-      - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies
-      - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows
-      - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music
-      - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos
-      - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu
-      # BACKUP: For backups
-      - ${BACKUP_DESTINATION:-/mnt/media/backup}:/backup
-    devices:
-      - /dev/dri:/dev/dri
-    ports:
-      - "8096:8096"
-      - "8920:8920"
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 90s
-    networks:
-      - media
-
-  # jellyfin
-  jellyfin:
-    image: lscr.io/linuxserver/jellyfin:latest
-    container_name: jellyfin
-    runtime: runc
-    deploy:
-      resources:
-       reservations:
+    # =============================================================================
+    # MEDIA SERVICES
+    # =============================================================================
+    # emby
+    emby:
+        image: emby/embyserver
+        container_name: emby
+        runtime: nvidia
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: all
+                          capabilities: [compute, utility, video]
+        environment:
+            - PUID=${PUID:-1000}
+            - PGID=${PGID:-1000}
+            - TZ=${TZ:-America/Toronto}
+            - LIBVA_DRIVER_NAME=${LIBVA_DRIVER_NAME:-iHD}
+        volumes:
+            # DATA: Database, metadata, cache
+            - emby_data:/config
+            - emby_cache:/cache
+            # TRANSCODE: Temporary
+            - /tmp:/transcode
+            # MEDIA: media files
+            - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies
+            - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows
+            - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music
+            - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos
+            - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu
+            # BACKUP: For backups
+            - ${BACKUP_DESTINATION:-/mnt/media/backup}:/backup
         devices:
-          - driver: nvidia
-            count: all
-            capabilities: [compute, utility, video]
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-America/Toronto}
-      - LIBVA_DRIVER_NAME=${LIBVA_DRIVER_NAME:-iHD}
-    volumes:
-      # DATA: Database, metadata, cache  
-      - jellyfin_data:/config
-      - jellyfin_cache:/cache
-      # TRANSCODE: Temporary
-      - /tmp:/transcode
-      # MEDIA: Read-only media files
-      - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies:ro
-      - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows:ro
-      - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music:ro
-      - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos:ro
-      - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu:ro
-    devices:
-      - /dev/dri:/dev/dri
-    ports:
-      - "8097:8096"  # Changed from 8096 to avoid conflict with Emby
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 90s
-    networks:
-      - media
+            - /dev/dri:/dev/dri
+        ports:
+            - "8096:8096"
+            - "8920:8920"
+        restart: always
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 90s
+        networks:
+            - media
 
-  # plex
-  plex:
-    image: lscr.io/linuxserver/plex:latest
-    container_name: plex
-    runtime: nvidia
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [compute, utility, video]
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-America/Toronto}
-      - VERSION=docker
-      - LIBVA_DRIVER_NAME=${LIBVA_DRIVER_NAME:-iHD}
-    volumes:
-      # DATA: Database, metadata, cache
-      - plex_data:/config
-      - plex_cache:/cache
-      # TRANSCODE: Temporary
-      - /tmp:/transcode
-      # MEDIA: Read-only media files
-      - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies:ro
-      - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows:ro
-      - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music:ro
-      - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos:ro
-      - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu:ro
-    devices:
-      - /dev/dri:/dev/dri
-    ports:
-      - "32400:32400"
-      - "1900:1900"
-      - "5353:5353"
-      - "32410:32410"
-      - "32412:32412"
-      - "32413:32413"
-      - "32414:32414"
-      - "32469:32469"
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:32400/identity"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 90s
-    networks:
-      - media
+    # jellyfin
+    jellyfin:
+        image: lscr.io/linuxserver/jellyfin:latest
+        container_name: jellyfin
+        runtime: runc
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: all
+                          capabilities: [compute, utility, video]
+        environment:
+            - PUID=${PUID:-1000}
+            - PGID=${PGID:-1000}
+            - TZ=${TZ:-America/Toronto}
+            - LIBVA_DRIVER_NAME=${LIBVA_DRIVER_NAME:-iHD}
+        volumes:
+            # DATA: Database, metadata, cache
+            - jellyfin_data:/config
+            - jellyfin_cache:/cache
+            # TRANSCODE: Temporary
+            - /tmp:/transcode
+            # MEDIA: Read-only media files
+            - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies:ro
+            - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows:ro
+            - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music:ro
+            - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos:ro
+            - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu:ro
+        devices:
+            - /dev/dri:/dev/dri
+        ports:
+            - "8097:8096" # Changed from 8096 to avoid conflict with Emby
+        restart: always
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 90s
+        networks:
+            - media
 
-  # calibre
-  calibre:
-    image: lscr.io/linuxserver/calibre:latest
-    container_name: calibre
-    security_opt:
-      - seccomp:unconfined
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-America/Toronto}
-    volumes:
-      # DATA: Database and converted files
-      - calibre_data:/config
-      # MEDIA: Books directory
-      - ${MEDIA_PATH_BOOKS:-/mnt/media/books}:/books
-    ports:
-      - "8082:8080"
-      - "8083:8081"
-    restart: always
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep -f calibre || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - books
+    # plex
+    plex:
+        image: lscr.io/linuxserver/plex:latest
+        container_name: plex
+        runtime: nvidia
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: all
+                          capabilities: [compute, utility, video]
+        environment:
+            - PUID=${PUID:-1000}
+            - PGID=${PGID:-1000}
+            - TZ=${TZ:-America/Toronto}
+            - VERSION=docker
+            - LIBVA_DRIVER_NAME=${LIBVA_DRIVER_NAME:-iHD}
+        volumes:
+            # DATA: Database, metadata, cache
+            - plex_data:/config
+            - plex_cache:/cache
+            # TRANSCODE: Temporary
+            - /tmp:/transcode
+            # MEDIA: Read-only media files
+            - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies:ro
+            - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows:ro
+            - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music:ro
+            - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos:ro
+            - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu:ro
+        devices:
+            - /dev/dri:/dev/dri
+        ports:
+            - "32400:32400"
+            - "1900:1900"
+            - "5353:5353"
+            - "32410:32410"
+            - "32412:32412"
+            - "32413:32413"
+            - "32414:32414"
+            - "32469:32469"
+        restart: always
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:32400/identity"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 90s
+        networks:
+            - media
 
-  # calibre web
-  calibre-web:
-    image: lscr.io/linuxserver/calibre-web:latest
-    container_name: calibre-web
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-America/Toronto}
-    volumes:
-      # DATA: Application data
-      - calibre_web_data:/data
-      # MEDIA: Read-only books
-      - ${MEDIA_PATH_BOOKS:-/mnt/media/books}:/books:ro
-    ports:
-      - "8084:8083"
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    networks:
-      - books
+    # calibre
+    calibre:
+        image: lscr.io/linuxserver/calibre:latest
+        container_name: calibre
+        security_opt:
+            - seccomp:unconfined
+        environment:
+            - PUID=${PUID:-1000}
+            - PGID=${PGID:-1000}
+            - TZ=${TZ:-America/Toronto}
+        volumes:
+            # DATA: Database and converted files
+            - calibre_data:/config
+            # MEDIA: Books directory
+            - ${MEDIA_PATH_BOOKS:-/mnt/media/books}:/books
+        ports:
+            - "8082:8080"
+            - "8083:8081"
+        restart: always
+        healthcheck:
+            test: ["CMD-SHELL", "pgrep -f calibre || exit 1"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 60s
+        networks:
+            - books
 
-  # =============================================================================
-  # DOWNLOAD MANAGEMENT
-  # =============================================================================
+    # calibre web
+    calibre-web:
+        image: lscr.io/linuxserver/calibre-web:latest
+        container_name: calibre-web
+        environment:
+            - PUID=${PUID:-1000}
+            - PGID=${PGID:-1000}
+            - TZ=${TZ:-America/Toronto}
+        volumes:
+            # DATA: Application data
+            - calibre_web_data:/data
+            # MEDIA: Read-only books
+            - ${MEDIA_PATH_BOOKS:-/mnt/media/books}:/books:ro
+        ports:
+            - "8084:8083"
+        restart: always
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8083"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
+        networks:
+            - books
 
-  # qbittorrent
-  qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:latest
-    container_name: qbittorrent
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-America/Toronto}
-      - WEBUI_PORT=8080
-    volumes:
-      # DATA: Application data and cache
-      - qbittorrent_data:/config
-      # DOWNLOADS: Active download directories
-      - ${DOWNLOAD_PATH_INCOMPLETE:-/media/qbittorrent/incomplete}:/incomplete
-      - ${DOWNLOAD_PATH_COMPLETE:-/mnt/media/qbittorrent/complete}:/complete
-      - ${DOWNLOAD_PATH_TORRENT:-/mnt/media/qbittorrent/torrent}:/torrent
-      - ${DOWNLOAD_PATH_MONITOR:-/mnt/media/monitor}:/monitor
-      # MEDIA: For seeding
-      - ${MEDIA_PATH_SEED:-/mnt/media/seed}:/seed
-      - ${MEDIA_PATH:-/mnt/media}:/media
-      - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu
-      - ${MEDIA_PATH_AUDIOBOOKS:-/media/audiobooks}:/audiobooks
-      - ${MEDIA_PATH_EBOOKS:-/mnt/media/books/ebooks}:/ebooks
-    ports:
-      - "8080:8080"
-      - "60000:60000"
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - download
+    # =============================================================================
+    # DOWNLOAD MANAGEMENT
+    # =============================================================================
 
-  # jackett
-  jackett:
-    image: lscr.io/linuxserver/jackett:latest
-    container_name: jackett
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-America/Toronto}
-      - AUTO_UPDATE=true
-    volumes:
-      # DATA: Database and cache
-      - jackett_data:/config
-    ports:
-      - "9117:9117"
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9117/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    networks:
-      - download
+    # qbittorrent
+    qbittorrent:
+        image: lscr.io/linuxserver/qbittorrent:latest
+        container_name: qbittorrent
+        environment:
+            - PUID=${PUID:-1000}
+            - PGID=${PGID:-1000}
+            - TZ=${TZ:-America/Toronto}
+            - WEBUI_PORT=8080
+        volumes:
+            # DATA: Application data and cache
+            - qbittorrent_data:/config
+            # DOWNLOADS: OS drive for fast I/O (*arr apps move to /mnt/media after processing)
+            - ${DOWNLOAD_PATH_INCOMPLETE:-/media/qbittorrent/incomplete}:/incomplete
+            - ${DOWNLOAD_PATH_COMPLETE:-/media/qbittorrent/complete}:/complete
+            - ${DOWNLOAD_PATH_TORRENT:-/media/qbittorrent/torrent}:/torrent
+            - ${DOWNLOAD_PATH_MONITOR:-/media/qbittorrent/monitor}:/monitor
+            # MEDIA: For seeding and *arr access to final destinations
+            - ${MEDIA_PATH_SEED:-/mnt/media/seed}:/seed
+            - ${MEDIA_PATH:-/mnt/media}:/media
+            - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu
+            - ${MEDIA_PATH_AUDIOBOOKS:-/mnt/media/books/audiobooks}:/audiobooks
+            - ${MEDIA_PATH_EBOOKS:-/mnt/media/ebooks}:/ebooks
+        ports:
+            - "8080:8080"
+            - "60000:60000"
+        restart: always
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8080"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 60s
+        networks:
+            - download
 
-  # flaresolverr
-  flaresolverr:
-    image: ghcr.io/flaresolverr/flaresolverr:latest
-    container_name: flaresolverr
-    environment:
-      - TZ=${TZ:-America/Toronto}
-      - LOG_LEVEL=${FLARESOLVERR_LOG_LEVEL:-info}
-      - LOG_HTML=${FLARESOLVERR_LOG_HTML:-false}
-      - CAPTCHA_SOLVER=${FLARESOLVERR_CAPTCHA_SOLVER:-none}
-    ports:
-      - "${FLARESOLVERR_PORT:-8191}:8191"
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8191/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    networks:
-      - download  # Assuming it's used by indexers like Jackett
+    # jackett
+    jackett:
+        image: lscr.io/linuxserver/jackett:latest
+        container_name: jackett
+        environment:
+            - PUID=${PUID:-1000}
+            - PGID=${PGID:-1000}
+            - TZ=${TZ:-America/Toronto}
+            - AUTO_UPDATE=true
+        volumes:
+            # DATA: Database and cache
+            - jackett_data:/config
+        ports:
+            - "9117:9117"
+        restart: always
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:9117/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
+        networks:
+            - download
 
-  # sonarr
-  sonarr:
-    image: lscr.io/linuxserver/sonarr:latest
-    container_name: sonarr
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-America/Toronto}
-    volumes:
-      # DATA: Database and logs
-      - sonarr_data:/config
-      # DOWNLOADS: For import
-      - ${DOWNLOAD_PATH_COMPLETE:-/mnt/media/qbittorrent/complete}:/complete
-      # MEDIA: TV shows directory
-      - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows
-      - ${MEDIA_PATH:-/mnt/media}:/media
-      - ${MEDIA_PATH_SHOWS_ALT:-/mnt/media/shows}:/sullivan
-    ports:
-      - "8989:8989"
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8989/ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - download
+    # flaresolverr
+    flaresolverr:
+        image: ghcr.io/flaresolverr/flaresolverr:latest
+        container_name: flaresolverr
+        environment:
+            - TZ=${TZ:-America/Toronto}
+            - LOG_LEVEL=${FLARESOLVERR_LOG_LEVEL:-info}
+            - LOG_HTML=${FLARESOLVERR_LOG_HTML:-false}
+            - CAPTCHA_SOLVER=${FLARESOLVERR_CAPTCHA_SOLVER:-none}
+        ports:
+            - "${FLARESOLVERR_PORT:-8191}:8191"
+        restart: always
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8191/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 30s
+        networks:
+            - download # Assuming it's used by indexers like Jackett
 
-  # radarr
-  radarr:
-    image: lscr.io/linuxserver/radarr:latest
-    container_name: radarr
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-America/Toronto}
-    volumes:
-      # DATA: Database and logs
-      - radarr_data:/config
-      # DOWNLOADS: For import
-      - ${DOWNLOAD_PATH_COMPLETE:-/mnt/media/qbittorrent/complete}:/complete
-      # MEDIA: Movies directory
-      - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies
-      - ${MEDIA_PATH:-/mnt/media}:/media
-      - ${MEDIA_PATH_MOVIES_ALT:-/mnt/media/movies}:/sullivan
-    ports:
-      - "7878:7878"
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7878/ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - download
+    # sonarr
+    sonarr:
+        image: lscr.io/linuxserver/sonarr:latest
+        container_name: sonarr
+        environment:
+            - PUID=${PUID:-1000}
+            - PGID=${PGID:-1000}
+            - TZ=${TZ:-America/Toronto}
+        volumes:
+            # DATA: Database and logs
+            - sonarr_data:/config
+            # DOWNLOADS: For import
+            - ${DOWNLOAD_PATH_COMPLETE:-/mnt/media/qbittorrent/complete}:/complete
+            # MEDIA: TV shows directory
+            - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows
+            - ${MEDIA_PATH:-/mnt/media}:/media
+            - ${MEDIA_PATH_SHOWS_ALT:-/mnt/media/shows}:/sullivan
+        ports:
+            - "8989:8989"
+        restart: always
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8989/ping"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 60s
+        networks:
+            - download
 
-  # lidarr
-  lidarr:
-    image: lscr.io/linuxserver/lidarr:latest
-    container_name: lidarr
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-America/Toronto}
-    volumes:
-      # DATA: Database and logs
-      - lidarr_data:/config
-      # DOWNLOADS: For import
-      - ${DOWNLOAD_PATH_COMPLETE:-/mnt/media/qbittorrent/complete}:/complete
-      # MEDIA: Music directory
-      - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music
-      - ${MEDIA_PATH:-/mnt/media}:/media
-    ports:
-      - "8686:8686"
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8686/ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - download
+    # radarr
+    radarr:
+        image: lscr.io/linuxserver/radarr:latest
+        container_name: radarr
+        environment:
+            - PUID=${PUID:-1000}
+            - PGID=${PGID:-1000}
+            - TZ=${TZ:-America/Toronto}
+        volumes:
+            # DATA: Database and logs
+            - radarr_data:/config
+            # DOWNLOADS: For import
+            - ${DOWNLOAD_PATH_COMPLETE:-/mnt/media/qbittorrent/complete}:/complete
+            # MEDIA: Movies directory
+            - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies
+            - ${MEDIA_PATH:-/mnt/media}:/media
+            - ${MEDIA_PATH_MOVIES_ALT:-/mnt/media/movies}:/sullivan
+        ports:
+            - "7878:7878"
+        restart: always
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:7878/ping"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 60s
+        networks:
+            - download
 
-  # unpackerr
-  unpackerr:
-    image: golift/unpackerr
-    container_name: unpackerr
-    volumes:
-      # DOWNLOADS: Working directories
-      - ${MEDIA_PATH:-/mnt/media}:/media
-      - ${DOWNLOAD_PATH_COMPLETE:-/mnt/media/qbittorrent/complete}:/complete
-    user: ${PUID:-1000}:${PGID:-1000}
-    environment:
-      - TZ=${TZ:-America/Toronto}
-      - UN_DEBUG=false
-      - UN_INTERVAL=2m
-      - UN_START_DELAY=1m
-      - UN_RETRY_DELAY=5m
-      - UN_MAX_RETRIES=3
-      - UN_PARALLEL=1
-      - UN_FILE_MODE=0777
-      - UN_DIR_MODE=0777
-      - UN_SONARR_0_URL=http://sonarr:8989
-      - UN_SONARR_0_API_KEY=${SONARR_API_KEY}
-      - UN_SONARR_0_PATHS_0=/complete/tv-sonarr
-      - UN_SONARR_0_PROTOCOLS=torrent
-      - UN_SONARR_0_TIMEOUT=10s
-      - UN_SONARR_0_DELETE_ORIG=false
-      - UN_SONARR_0_DELETE_DELAY=5m
-      - UN_RADARR_0_URL=http://radarr:7878
-      - UN_RADARR_0_API_KEY=${RADARR_API_KEY}
-      - UN_RADARR_0_PATHS_0=/complete/radarr
-      - UN_RADARR_0_PROTOCOLS=torrent
-      - UN_RADARR_0_TIMEOUT=10s
-      - UN_RADARR_0_DELETE_ORIG=false
-      - UN_RADARR_0_DELETE_DELAY=5m
-      - UN_LIDARR_0_URL=http://lidarr:8686
-      - UN_LIDARR_0_API_KEY=${LIDARR_API_KEY}
-      - UN_LIDARR_0_PATHS_0=/complete/lidarr
-      - UN_LIDARR_0_PROTOCOLS=torrent
-      - UN_LIDARR_0_TIMEOUT=10s
-      - UN_LIDARR_0_DELETE_ORIG=false
-      - UN_LIDARR_0_DELETE_DELAY=5m
-      - UN_FOLDER_0_PATH=/complete
-      - UN_FOLDER_0_DELETE_AFTER=10m
-      - UN_FOLDER_0_DELETE_ORIGINAL=false
-      - UN_FOLDER_0_DELETE_FILES=false
-      - UN_FOLDER_0_MOVE_BACK=false
-    security_opt:
-      - no-new-privileges:true
-    restart: always
-    networks:
-      - download  # Needs to reach *arr services
+    # lidarr
+    lidarr:
+        image: lscr.io/linuxserver/lidarr:latest
+        container_name: lidarr
+        environment:
+            - PUID=${PUID:-1000}
+            - PGID=${PGID:-1000}
+            - TZ=${TZ:-America/Toronto}
+        volumes:
+            # DATA: Database and logs
+            - lidarr_data:/config
+            # DOWNLOADS: For import
+            - ${DOWNLOAD_PATH_COMPLETE:-/mnt/media/qbittorrent/complete}:/complete
+            # MEDIA: Music directory
+            - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music
+            - ${MEDIA_PATH:-/mnt/media}:/media
+        ports:
+            - "8686:8686"
+        restart: always
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8686/ping"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 60s
+        networks:
+            - download
 
-  # doplarr
-  doplarr:
-    image: lscr.io/linuxserver/doplarr:latest
-    container_name: doplarr
-    depends_on:
-      - radarr
-      - sonarr
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-America/Toronto}
-      - DISCORD__TOKEN=${DISCORD_TOKEN}
-      - RADARR__API=${RADARR_API_KEY}
-      - RADARR__URL=http://radarr:7878
-      - SONARR__API=${SONARR_API_KEY}
-      - SONARR__URL=http://sonarr:8989
-      - DISCORD__MAX_RESULTS=${DISCORD_MAX_RESULTS:-25}
-      - DISCORD__REQUESTED_MSG_STYLE=${DISCORD_MSG_STYLE:-:plain}
-      - SONARR__QUALITY_PROFILE=${SONARR_QUALITY_PROFILE:-Any}
-      - RADARR__QUALITY_PROFILE=${RADARR_QUALITY_PROFILE:-Any}
-      - SONARR__ROOTFOLDER=${SONARR_ROOT_FOLDER:-/shows}
-      - RADARR__ROOTFOLDER=${RADARR_ROOT_FOLDER:-/movies}
-      - SONARR__LANGUAGE_PROFILE=${SONARR_LANGUAGE_PROFILE:-English}
-      - OVERSEERR__DEFAULT_ID=
-      - PARTIAL_SEASONS=true
-      - LOG_LEVEL=:info
-    restart: always
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep -f doplarr || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    networks:
-      - download  # Depends on *arr services
+    # unpackerr
+    unpackerr:
+        image: golift/unpackerr
+        container_name: unpackerr
+        volumes:
+            # DOWNLOADS: Working directories
+            - ${MEDIA_PATH:-/mnt/media}:/media
+            - ${DOWNLOAD_PATH_COMPLETE:-/mnt/media/qbittorrent/complete}:/complete
+        user: ${PUID:-1000}:${PGID:-1000}
+        environment:
+            - TZ=${TZ:-America/Toronto}
+            - UN_DEBUG=false
+            - UN_INTERVAL=2m
+            - UN_START_DELAY=1m
+            - UN_RETRY_DELAY=5m
+            - UN_MAX_RETRIES=3
+            - UN_PARALLEL=1
+            - UN_FILE_MODE=0777
+            - UN_DIR_MODE=0777
+            - UN_SONARR_0_URL=http://sonarr:8989
+            - UN_SONARR_0_API_KEY=${SONARR_API_KEY}
+            - UN_SONARR_0_PATHS_0=/complete/tv-sonarr
+            - UN_SONARR_0_PROTOCOLS=torrent
+            - UN_SONARR_0_TIMEOUT=10s
+            - UN_SONARR_0_DELETE_ORIG=false
+            - UN_SONARR_0_DELETE_DELAY=5m
+            - UN_RADARR_0_URL=http://radarr:7878
+            - UN_RADARR_0_API_KEY=${RADARR_API_KEY}
+            - UN_RADARR_0_PATHS_0=/complete/radarr
+            - UN_RADARR_0_PROTOCOLS=torrent
+            - UN_RADARR_0_TIMEOUT=10s
+            - UN_RADARR_0_DELETE_ORIG=false
+            - UN_RADARR_0_DELETE_DELAY=5m
+            - UN_LIDARR_0_URL=http://lidarr:8686
+            - UN_LIDARR_0_API_KEY=${LIDARR_API_KEY}
+            - UN_LIDARR_0_PATHS_0=/complete/lidarr
+            - UN_LIDARR_0_PROTOCOLS=torrent
+            - UN_LIDARR_0_TIMEOUT=10s
+            - UN_LIDARR_0_DELETE_ORIG=false
+            - UN_LIDARR_0_DELETE_DELAY=5m
+            - UN_FOLDER_0_PATH=/complete
+            - UN_FOLDER_0_DELETE_AFTER=10m
+            - UN_FOLDER_0_DELETE_ORIGINAL=false
+            - UN_FOLDER_0_DELETE_FILES=false
+            - UN_FOLDER_0_MOVE_BACK=false
+        security_opt:
+            - no-new-privileges:true
+        restart: always
+        networks:
+            - download # Needs to reach *arr services
 
-  # =============================================================================
-  # UTILITY SERVICES
-  # =============================================================================
+    # doplarr
+    doplarr:
+        image: lscr.io/linuxserver/doplarr:latest
+        container_name: doplarr
+        depends_on:
+            - radarr
+            - sonarr
+        environment:
+            - PUID=${PUID:-1000}
+            - PGID=${PGID:-1000}
+            - TZ=${TZ:-America/Toronto}
+            - DISCORD__TOKEN=${DISCORD_TOKEN}
+            - RADARR__API=${RADARR_API_KEY}
+            - RADARR__URL=http://radarr:7878
+            - SONARR__API=${SONARR_API_KEY}
+            - SONARR__URL=http://sonarr:8989
+            - DISCORD__MAX_RESULTS=${DISCORD_MAX_RESULTS:-25}
+            - DISCORD__REQUESTED_MSG_STYLE=${DISCORD_MSG_STYLE:-:plain}
+            - SONARR__QUALITY_PROFILE=${SONARR_QUALITY_PROFILE:-Any}
+            - RADARR__QUALITY_PROFILE=${RADARR_QUALITY_PROFILE:-Any}
+            - SONARR__ROOTFOLDER=${SONARR_ROOT_FOLDER:-/shows}
+            - RADARR__ROOTFOLDER=${RADARR_ROOT_FOLDER:-/movies}
+            - SONARR__LANGUAGE_PROFILE=${SONARR_LANGUAGE_PROFILE:-English}
+            - OVERSEERR__DEFAULT_ID=
+            - PARTIAL_SEASONS=true
+            - LOG_LEVEL=:info
+        restart: always
+        healthcheck:
+            test: ["CMD-SHELL", "pgrep -f doplarr || exit 1"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 30s
+        networks:
+            - download # Depends on *arr services
 
-  # filebot node
-  filebot-node:
-    container_name: filebot-node
-    image: rednoah/filebot:node
-    volumes:
-      # DATA: Application data
-      - filebot_data:/config
-      # MEDIA: For organizing
-      - ${MEDIA_PATH:-/mnt/media}:/media
-      - ${MEDIA_PATH_CLEAN:-/mnt/media/clean}:/clean
-      - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies
-      - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows
-      - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music
-      - ${DOWNLOAD_PATH_COMPLETE:-/mnt/media/qbittorrent/complete}:/complete
-    ports:
-      - "5452:5452"
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-America/Toronto}
-      - FILEBOT_NODE_AUTH=BASIC
-      - FILEBOT_NODE_AUTH_USER=${FILEBOT_USER}
-      - FILEBOT_NODE_AUTH_PASS=${FILEBOT_PASSWORD}
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5452"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    networks:
-      - utilities
-      - download  # If it needs access to downloads
+    # =============================================================================
+    # UTILITY SERVICES
+    # =============================================================================
 
-  # youtube-dl
-  ytdl_material:
-    image: tzahi12345/youtubedl-material:latest
-    container_name: ytdl_material
-    environment:
-      - ytdl_mongodb_connection_string=mongodb://ytdl-mongo-db:27017
-      - ytdl_use_local_db=false
-      - write_ytdl_config=true
-    depends_on:
-      - ytdl-mongo-db
-    volumes:
-      # DATA: Application data
-      - ytdl_data:/app/appdata
-      # MEDIA: Download directories
-      - ${YOUTUBE_AUDIO_PATH:-/mnt/media/youtube/audio}:/app/audio
-      - ${YOUTUBE_VIDEO_PATH:-/mnt/media/youtube/video}:/app/video
-    ports:
-      - "8998:17442"
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:17442"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - utilities
-      - database  # For MongoDB access
+    # filebot node
+    filebot-node:
+        container_name: filebot-node
+        image: rednoah/filebot:node
+        volumes:
+            # DATA: Application data
+            - filebot_data:/config
+            # MEDIA: For organizing
+            - ${MEDIA_PATH:-/mnt/media}:/media
+            - ${MEDIA_PATH_CLEAN:-/mnt/media/clean}:/clean
+            - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies
+            - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows
+            - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music
+            - ${DOWNLOAD_PATH_COMPLETE:-/mnt/media/qbittorrent/complete}:/complete
+        ports:
+            - "5452:5452"
+        environment:
+            - PUID=${PUID:-1000}
+            - PGID=${PGID:-1000}
+            - TZ=${TZ:-America/Toronto}
+            - FILEBOT_NODE_AUTH=BASIC
+            - FILEBOT_NODE_AUTH_USER=${FILEBOT_USER}
+            - FILEBOT_NODE_AUTH_PASS=${FILEBOT_PASSWORD}
+        restart: always
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:5452"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
+        networks:
+            - utilities
+            - download # If it needs access to downloads
 
-  # duplicati
-  duplicati:
-    image: lscr.io/linuxserver/duplicati:latest
-    container_name: duplicati
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-America/Toronto}
-      - SETTINGS_ENCRYPTION_KEY=${DUPLICATI_ENCRYPTION_KEY}
-    volumes:
-      # DATA: Application data
-      - duplicati_data:/config
-      # BACKUP: Source and destination
-      - ${BACKUP_DESTINATION:-/mnt/media/backup}:/backup
-      - ${BACKUP_SOURCE:-/home/jordan/}:/source
-    ports:
-      - "8200:8200"
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8200"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    networks:
-      - utilities
+    # youtube-dl
+    ytdl_material:
+        image: tzahi12345/youtubedl-material:latest
+        container_name: ytdl_material
+        environment:
+            - ytdl_mongodb_connection_string=mongodb://ytdl-mongo-db:27017
+            - ytdl_use_local_db=false
+            - write_ytdl_config=true
+        depends_on:
+            - ytdl-mongo-db
+        volumes:
+            # DATA: Application data
+            - ytdl_data:/app/appdata
+            # MEDIA: Download directories
+            - ${YOUTUBE_AUDIO_PATH:-/mnt/media/youtube/audio}:/app/audio
+            - ${YOUTUBE_VIDEO_PATH:-/mnt/media/youtube/video}:/app/video
+        ports:
+            - "8998:17442"
+        restart: always
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:17442"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 60s
+        networks:
+            - utilities
+            - database # For MongoDB access
 
-  # mealie
-  mealie:
-    image: ghcr.io/mealie-recipes/mealie:nightly
-    container_name: mealie
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-America/Toronto}
-      - ALLOW_SIGNUP=true
-      - PGUSERDB=mealie
-      - PGPASSWORD=${MEALIE_DB_PASSWORD}
-      - LDAP_AUTH_ENABLED=false
-      - MAX_WORKERS=1
-      - WEB_CONCURRENCY=1
-      - BASE_URL=${MEALIE_BASE_URL:-http://localhost:9925}
-    volumes:
-      # DATA: Application data and recipes
-      - mealie_data:/app/data
-    ports:
-      - "9925:9000"
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/api/app/about"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - utilities
+    # duplicati
+    duplicati:
+        image: lscr.io/linuxserver/duplicati:latest
+        container_name: duplicati
+        environment:
+            - PUID=${PUID:-1000}
+            - PGID=${PGID:-1000}
+            - TZ=${TZ:-America/Toronto}
+            - SETTINGS_ENCRYPTION_KEY=${DUPLICATI_ENCRYPTION_KEY}
+        volumes:
+            # DATA: Application data
+            - duplicati_data:/config
+            # BACKUP: Source and destination
+            - ${BACKUP_DESTINATION:-/mnt/media/backup}:/backup
+            - ${BACKUP_SOURCE:-/home/jordan/}:/source
+        ports:
+            - "8200:8200"
+        restart: always
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8200"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
+        networks:
+            - utilities
 
-  # grocy
-  grocy:
-    image: lscr.io/linuxserver/grocy:latest
-    container_name: grocy
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-America/Toronto}
-    volumes:
-      # DATA: Application data
-      - grocy_data:/config
-    ports:
-      - "9283:80"
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    networks:
-      - utilities
+    # mealie
+    mealie:
+        image: ghcr.io/mealie-recipes/mealie:nightly
+        container_name: mealie
+        environment:
+            - PUID=${PUID:-1000}
+            - PGID=${PGID:-1000}
+            - TZ=${TZ:-America/Toronto}
+            - ALLOW_SIGNUP=true
+            - PGUSERDB=mealie
+            - PGPASSWORD=${MEALIE_DB_PASSWORD}
+            - LDAP_AUTH_ENABLED=false
+            - MAX_WORKERS=1
+            - WEB_CONCURRENCY=1
+            - BASE_URL=${MEALIE_BASE_URL:-http://localhost:9925}
+        volumes:
+            # DATA: Application data and recipes
+            - mealie_data:/app/data
+        ports:
+            - "9925:9000"
+        restart: always
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:9000/api/app/about"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 60s
+        networks:
+            - utilities
 
-  # syncthing - file synchronization
-  syncthing:
-    image: lscr.io/linuxserver/syncthing:latest
-    container_name: syncthing_sullivan
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-America/Toronto}
-    volumes:
-      # DATA: Application data
-      - syncthing_data:/config
-      # SYNC: Directories to sync (media content)
-      - ${SYNCTHING_MEDIA_PATH:-/mnt/media}:/sync/media
-      - ${SYNCTHING_DOWNLOADS_PATH:-/mnt/media/qbittorrent}:/sync/downloads
-    ports:
-      - "8384:8384"
-      - "22000:22000/tcp"
-      - "22000:22000/udp"
-      - "21027:21027/udp"
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8384"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    networks:
-      - utilities
+    # grocy
+    grocy:
+        image: lscr.io/linuxserver/grocy:latest
+        container_name: grocy
+        environment:
+            - PUID=${PUID:-1000}
+            - PGID=${PGID:-1000}
+            - TZ=${TZ:-America/Toronto}
+        volumes:
+            # DATA: Application data
+            - grocy_data:/config
+        ports:
+            - "9283:80"
+        restart: always
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:80"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
+        networks:
+            - utilities
 
-  # wiki.js - knowledge management and documentation
-  wiki:
-    image: ghcr.io/requarks/wiki:2
-    container_name: wiki
-    depends_on:
-      - wiki-postgres
-    environment:
-      - TZ=${TZ:-America/Toronto}
-      - DB_TYPE=postgres
-      - DB_HOST=wiki-postgres
-      - DB_PORT=5432
-      - DB_USER=${WIKI_DB_USER:-wikijs}
-      - DB_PASS=${WIKI_DB_PASSWORD:-wikijsrocks}
-      - DB_NAME=${WIKI_DB_NAME:-wiki}
-    volumes:
-      # DATA: Application data
-      - wiki_data:/config
-    ports:
-      - "8090:3000"
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - utilities
-      - database  # For Postgres access
+    # syncthing - file synchronization
+    syncthing:
+        image: lscr.io/linuxserver/syncthing:latest
+        container_name: syncthing_sullivan
+        environment:
+            - PUID=${PUID:-1000}
+            - PGID=${PGID:-1000}
+            - TZ=${TZ:-America/Toronto}
+        volumes:
+            # DATA: Application data
+            - syncthing_data:/config
+            # SYNC: Directories to sync (media content)
+            - ${SYNCTHING_MEDIA_PATH:-/mnt/media}:/sync/media
+            - ${SYNCTHING_DOWNLOADS_PATH:-/mnt/media/qbittorrent}:/sync/downloads
+        ports:
+            - "8384:8384"
+            - "22000:22000/tcp"
+            - "22000:22000/udp"
+            - "21027:21027/udp"
+        restart: always
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8384"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
+        networks:
+            - utilities
 
-  # =============================================================================
-  # DATABASE SERVICES
-  # =============================================================================
+    # wiki.js - knowledge management and documentation
+    wiki:
+        image: ghcr.io/requarks/wiki:2
+        container_name: wiki
+        depends_on:
+            - wiki-postgres
+        environment:
+            - TZ=${TZ:-America/Toronto}
+            - DB_TYPE=postgres
+            - DB_HOST=wiki-postgres
+            - DB_PORT=5432
+            - DB_USER=${WIKI_DB_USER:-wikijs}
+            - DB_PASS=${WIKI_DB_PASSWORD:-wikijsrocks}
+            - DB_NAME=${WIKI_DB_NAME:-wiki}
+        volumes:
+            # DATA: Application data
+            - wiki_data:/config
+        ports:
+            - "8090:3000"
+        restart: always
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 60s
+        networks:
+            - utilities
+            - database # For Postgres access
 
-  # ytdl-mongo-db
-  ytdl-mongo-db:
-    image: mongo:latest
-    container_name: mongo-db
-    logging:
-      driver: "none"
-    volumes:
-      # DATA: MongoDB data files
-      - ytdl_mongodb:/data/db
-    restart: always
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok", "--quiet"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    networks:
-      - database
+    # =============================================================================
+    # DATABASE SERVICES
+    # =============================================================================
 
-  # wiki-postgres - database for wiki.js
-  wiki-postgres:
-    image: postgres:15-alpine
-    container_name: wiki-postgres
-    environment:
-      - POSTGRES_DB=${WIKI_DB_NAME:-wiki}
-      - POSTGRES_USER=${WIKI_DB_USER:-wikijs}
-      - POSTGRES_PASSWORD=${WIKI_DB_PASSWORD:-123456}
-      - TZ=${TZ:-America/Toronto}
-    volumes:
-      # DATA: Database files
-      - wiki_postgres:/var/lib/postgresql/data
-    logging:
-      driver: "none"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${WIKI_DB_USER:-wikijs}"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    networks:
-      - database
+    # ytdl-mongo-db
+    ytdl-mongo-db:
+        image: mongo:latest
+        container_name: mongo-db
+        logging:
+            driver: "none"
+        volumes:
+            # DATA: MongoDB data files
+            - ytdl_mongodb:/data/db
+        restart: always
+        healthcheck:
+            test:
+                [
+                    "CMD",
+                    "mongosh",
+                    "--eval",
+                    "db.runCommand('ping').ok",
+                    "--quiet",
+                ]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
+        networks:
+            - database
+
+    # wiki-postgres - database for wiki.js
+    wiki-postgres:
+        image: postgres:15-alpine
+        container_name: wiki-postgres
+        environment:
+            - POSTGRES_DB=${WIKI_DB_NAME:-wiki}
+            - POSTGRES_USER=${WIKI_DB_USER:-wikijs}
+            - POSTGRES_PASSWORD=${WIKI_DB_PASSWORD:-123456}
+            - TZ=${TZ:-America/Toronto}
+        volumes:
+            # DATA: Database files
+            - wiki_postgres:/var/lib/postgresql/data
+        logging:
+            driver: "none"
+        restart: unless-stopped
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${WIKI_DB_USER:-wikijs}"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
+        networks:
+            - database
