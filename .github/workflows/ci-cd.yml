@@ -1,0 +1,270 @@
+# ============================================================================
+# CI/CD Pipeline for SULLIVAN - Media Server
+# ============================================================================
+# Home media server running Emby, Jellyfin, Plex, Sonarr, Radarr, etc.
+# Repository: nuniesmith/sullivan
+#
+# Services: emby, jellyfin, plex, sonarr, radarr, lidarr, jackett, qbittorrent, calibre
+#
+# Features:
+#   - Deployment via Tailscale + SSH
+#   - Docker container management
+#   - Health checks
+#   - Discord notifications
+#
+# Note: DNS records and SSL certificates are managed by Freddy's CI/CD pipeline.
+#       Freddy's nginx reverse proxies Sullivan services over Tailscale.
+# ============================================================================
+
+name: 🎬 Sullivan Deploy
+
+on:
+    push:
+        branches:
+            - main
+        paths-ignore:
+            - "**.md"
+            - "docs/**"
+            - ".gitignore"
+    pull_request:
+        branches: [main]
+    workflow_dispatch:
+        inputs:
+            skip_deploy:
+                description: "Skip deployment (test workflow only)"
+                required: false
+                type: boolean
+                default: false
+            notify_discord:
+                description: "Send Discord notification"
+                required: false
+                type: boolean
+                default: true
+
+permissions:
+    contents: read
+
+env:
+    SERVER_NAME: sullivan
+    PROJECT_PATH: ~/sullivan
+    DOMAIN: sullivan.7gram.xyz
+    # Note: Sullivan services are accessed via Freddy's nginx reverse proxy
+    # DNS records point to Freddy's Tailscale IP, which proxies to Sullivan over Tailscale
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+defaults:
+    run:
+        shell: bash
+
+jobs:
+    # ==========================================================================
+    # DEPLOY
+    # ==========================================================================
+    deploy:
+        name: 🚀 Deploy to Sullivan
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        if: |
+            github.event_name == 'push' ||
+            (github.event_name == 'workflow_dispatch' && !inputs.skip_deploy)
+
+        steps:
+            - name: 📥 Checkout code
+              uses: actions/checkout@v4
+
+            # ======================================================================
+            # TAILSCALE CONNECTION
+            # ======================================================================
+            - name: 🔌 Connect to Tailscale
+              id: tailscale
+              uses: nuniesmith/actions/.github/actions/tailscale-connect@main
+              with:
+                  oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
+                  oauth-secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
+                  target-ip: ${{ secrets.SULLIVAN_TAILSCALE_IP }}
+                  target-ssh-port: ${{ secrets.SSH_PORT || '22' }}
+
+            # ======================================================================
+            # DEPLOY VIA SSH
+            # ======================================================================
+            - name: 🚀 Deploy via SSH
+              id: deploy
+              if: steps.tailscale.outputs.connected == 'true'
+              uses: nuniesmith/actions/.github/actions/ssh-deploy@main
+              with:
+                  host: ${{ secrets.SULLIVAN_TAILSCALE_IP }}
+                  port: ${{ secrets.SSH_PORT || '22' }}
+                  username: ${{ secrets.SSH_USER || 'actions' }}
+                  ssh-key: ${{ secrets.SULLIVAN_SSH_KEY }}
+                  project-path: ${{ env.PROJECT_PATH }}
+                  git-pull: false
+                  git-branch: ${{ github.ref_name }}
+                  docker-pull: false
+                  docker-prune: false
+                  pre-deploy-command: |
+                      echo "🎬 Deploying to Sullivan server..."
+
+                      # Handle git repository setup
+                      if [ ! -d "${{ env.PROJECT_PATH }}/.git" ]; then
+                        if [ -d "${{ env.PROJECT_PATH }}" ]; then
+                          echo "📁 Directory exists but is not a git repo - initializing..."
+                          cd ${{ env.PROJECT_PATH }}
+                          git init
+                          git remote add origin https://github.com/${{ github.repository }}.git
+                          git fetch origin
+                          git checkout -f ${{ github.ref_name }}
+                          git branch --set-upstream-to=origin/${{ github.ref_name }} ${{ github.ref_name }}
+                        else
+                          echo "📥 First deployment - cloning repository..."
+                          mkdir -p $(dirname ${{ env.PROJECT_PATH }})
+                          git clone https://github.com/${{ github.repository }}.git ${{ env.PROJECT_PATH }}
+                          cd ${{ env.PROJECT_PATH }}
+                          git checkout ${{ github.ref_name }}
+                        fi
+                      else
+                        cd ${{ env.PROJECT_PATH }}
+                        echo "📥 Pulling latest changes..."
+                        git fetch origin
+                        git checkout ${{ github.ref_name }}
+                        git pull origin ${{ github.ref_name }}
+                      fi
+
+                      # Ensure run.sh is executable
+                      chmod +x ./run.sh 2>/dev/null || true
+
+                      # Load environment variables
+                      if [ -f .env ]; then
+                        set -a && source .env && set +a
+                        echo "✓ Environment loaded"
+                      fi
+
+                  deploy-command: |
+                      cd ${{ env.PROJECT_PATH }}
+
+                      echo "📂 Current directory: $(pwd)"
+                      echo "🌿 Git branch: $(git branch --show-current)"
+                      echo "📝 Latest commit: $(git log -1 --oneline)"
+
+                      # Deploy using run.sh
+                      if [ -x "./run.sh" ]; then
+                        echo "🐳 Pulling latest images..."
+                        docker compose pull --ignore-pull-failures 2>&1 || true
+                        echo "🐳 Stopping existing services..."
+                        ./run.sh stop 2>/dev/null || true
+                        echo "🐳 Starting services in production mode..."
+                        ./run.sh start prod 2>&1
+                      else
+                        echo "⚠️ run.sh not found, using docker compose directly"
+                        docker compose pull --ignore-pull-failures
+                        docker compose up -d --remove-orphans
+                      fi
+
+                  post-deploy-command: |
+                      cd ${{ env.PROJECT_PATH }}
+
+                      echo ""
+                      echo "📊 Service Status:"
+                      docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || docker ps --format "table {{.Names}}\t{{.Status}}"
+
+                      echo ""
+                      echo "💾 Disk Usage:"
+                      df -h / | tail -1
+
+                      echo ""
+                      echo "🧠 Memory Usage:"
+                      free -h | head -2
+
+                      echo ""
+                      echo "🌐 Network Note:"
+                      echo "   Sullivan services are accessed via Freddy's nginx reverse proxy"
+                      echo "   DNS records point to Freddy's Tailscale IP"
+
+                      echo ""
+                      echo "✅ Deployment complete!"
+
+            # ======================================================================
+            # HEALTH CHECKS
+            # ======================================================================
+            - name: 🏥 Run Health Checks
+              id: health-checks
+              if: always() && steps.deploy.outcome == 'success'
+              uses: nuniesmith/actions/.github/actions/health-check@main
+              with:
+                  containers: emby,jellyfin,plex,sonarr,radarr,lidarr,qbittorrent,jackett
+                  ssh-host: ${{ secrets.SULLIVAN_TAILSCALE_IP }}
+                  ssh-port: ${{ secrets.SSH_PORT || '22' }}
+                  ssh-user: ${{ secrets.SSH_USER || 'actions' }}
+                  ssh-key: ${{ secrets.SULLIVAN_SSH_KEY }}
+                  initial-delay: 30
+                  retry-count: 3
+                  retry-delay: 10
+                  fail-on-unhealthy: false
+
+            # ======================================================================
+            # DISCORD NOTIFICATION
+            # ======================================================================
+            - name: 📣 Notify deployment
+              if: always() && (inputs.notify_discord != false)
+              uses: nuniesmith/actions/.github/actions/discord-notify@main
+              continue-on-error: true
+              with:
+                  webhook-url: ${{ secrets.DISCORD_WEBHOOK_ACTIONS }}
+                  title: "🎬 Sullivan Deployment"
+                  description: "Media server deployment"
+                  status: ${{ steps.deploy.outcome == 'success' && 'success' || 'failure' }}
+                  include-repo-info: true
+                  fields: |
+                      [
+                        {"name": "Server", "value": "Sullivan", "inline": true},
+                        {"name": "Branch", "value": "${{ github.ref_name }}", "inline": true},
+                        {"name": "Health", "value": "${{ steps.health-checks.outputs.healthy == 'true' && '✅ Healthy' || '⚠️ Check Required' }}", "inline": true}
+                      ]
+
+    # ==========================================================================
+    # PIPELINE SUMMARY
+    # ==========================================================================
+    summary:
+        name: 📊 Summary
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        needs: [deploy]
+        if: always()
+
+        steps:
+            - name: 📊 Generate summary
+              run: |
+                  echo "## 🎬 Sullivan Deployment Summary" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "| Step | Status |" >> $GITHUB_STEP_SUMMARY
+                  echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+
+                  # Deploy status
+                  if [ "${{ needs.deploy.result }}" = "success" ]; then
+                    echo "| 🚀 Deploy | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+                  elif [ "${{ needs.deploy.result }}" = "skipped" ]; then
+                    echo "| 🚀 Deploy | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
+                  else
+                    echo "| 🚀 Deploy | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+                  fi
+
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "### 📋 Details" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Server:** Sullivan (Media Server)" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Domain:** ${{ env.DOMAIN }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "### 🔧 Architecture" >> $GITHUB_STEP_SUMMARY
+                  echo "- Sullivan services are accessed via Freddy's nginx reverse proxy" >> $GITHUB_STEP_SUMMARY
+                  echo "- DNS records and SSL certificates are managed by Freddy's CI/CD pipeline" >> $GITHUB_STEP_SUMMARY
+                  echo "- Freddy proxies requests to Sullivan over Tailscale network" >> $GITHUB_STEP_SUMMARY
+
+            - name: ❌ Fail on deployment error
+              if: needs.deploy.result == 'failure'
+              run: |
+                  echo "::error::Deployment to Sullivan failed"
+                  exit 1

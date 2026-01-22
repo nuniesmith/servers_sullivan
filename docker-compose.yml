@@ -86,12 +86,14 @@ services:
       - emby_cache:/cache
       # TRANSCODE: Temporary
       - /tmp:/transcode
-      # MEDIA: Read-only media files
+      # MEDIA: media files
       - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies
       - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows
       - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music
       - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos
       - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu
+      # BACKUP: For backups
+      - ${BACKUP_DESTINATION:-/mnt/media/backup}:/backup
     devices:
       - /dev/dri:/dev/dri
     ports:
@@ -112,13 +114,13 @@ services:
     image: lscr.io/linuxserver/jellyfin:latest
     container_name: jellyfin
     runtime: runc
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [compute, utility, video]
+    deploy:
+      resources:
+       reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [compute, utility, video]
     environment:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
