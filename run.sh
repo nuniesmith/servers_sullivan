@@ -47,9 +47,7 @@ SERVICES=(
     # Book management
     "calibre" "calibre-web"
     # Utility services
-    "filebot-node" "ytdl_material" "duplicati" "mealie" "grocy" "syncthing" "wiki"
-    # Monitoring (last)
-    "watchtower"
+    "filebot-node" "ytdl_material" "duplicati" "mealie" "grocy" "wiki"
 )
 
 COMPOSE_CMD=""
@@ -180,7 +178,7 @@ cleanup_orphans() {
 
     # Find and remove any stopped containers with sullivan-related names
     local orphans
-    orphans=$(docker ps -a --filter "status=exited" --filter "status=dead" --format "{{.Names}}" | grep -E "sullivan|emby|jellyfin|plex|sonarr|radarr|lidarr|qbittorrent|jackett|calibre|mealie|grocy|wiki|syncthing|duplicati|watchtower|ytdl|filebot|doplarr|unpackerr|flaresolverr" || true)
+    orphans=$(docker ps -a --filter "status=exited" --filter "status=dead" --format "{{.Names}}" | grep -E "sullivan|emby|jellyfin|plex|sonarr|radarr|lidarr|qbittorrent|jackett|calibre|mealie|grocy|wiki|duplicati|ytdl|filebot|doplarr|unpackerr|flaresolverr" || true)
 
     if [[ -n "$orphans" ]]; then
         log INFO "Removing orphan containers:"
@@ -413,11 +411,6 @@ MEALIE_DB_PASSWORD=changeme_mealie_password
 # =============================================================================
 DUPLICATI_ENCRYPTION_KEY=changeme_duplicati_key
 
-# =============================================================================
-# Watchtower
-# =============================================================================
-WATCHTOWER_SCHEDULE="0 2 * * *"
-WATCHTOWER_NOTIFICATION_URL=
 EOF
 
     log INFO ".env file created at $env_file"
@@ -781,8 +774,8 @@ ${BOLD}Services:${NC}
     Media:      emby, jellyfin, plex
     Downloads:  qbittorrent, jackett, sonarr, radarr, lidarr, flaresolverr
     Books:      calibre, calibre-web
-    Utils:      mealie, wiki, grocy, syncthing, duplicati, filebot-node
-    Other:      watchtower, doplarr, unpackerr, ytdl_material
+    Utils:      mealie, wiki, grocy, duplicati, filebot-node
+    Other:      doplarr, unpackerr, ytdl_material
 
 ${BOLD}Examples:${NC}
     $(basename "$0") start                    # Start all services
