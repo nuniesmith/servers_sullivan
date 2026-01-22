@@ -107,11 +107,15 @@ jobs:
                   pre-deploy-command: |
                       echo "🎬 Deploying to Sullivan server..."
 
+                      # Expand tilde to actual home directory
+                      PROJECT_DIR="${HOME}/sullivan"
+                      echo "📁 Project directory: $PROJECT_DIR"
+
                       # Handle git repository setup
-                      if [ ! -d "${{ env.PROJECT_PATH }}/.git" ]; then
-                        if [ -d "${{ env.PROJECT_PATH }}" ]; then
+                      if [ ! -d "$PROJECT_DIR/.git" ]; then
+                        if [ -d "$PROJECT_DIR" ] && [ "$(ls -A $PROJECT_DIR 2>/dev/null)" ]; then
                           echo "📁 Directory exists but is not a git repo - converting..."
-                          cd ${{ env.PROJECT_PATH }}
+                          cd "$PROJECT_DIR"
 
                           # Preserve local files that shouldn't be overwritten
                           BACKUP_DIR=$(mktemp -d)
@@ -142,13 +146,15 @@ jobs:
                           echo "✓ Git repository initialized from existing directory"
                         else
                           echo "📥 First deployment - cloning repository..."
-                          mkdir -p $(dirname ${{ env.PROJECT_PATH }})
-                          git clone https://github.com/${{ github.repository }}.git ${{ env.PROJECT_PATH }}
-                          cd ${{ env.PROJECT_PATH }}
+                          # Remove empty directory if it exists
+                          [ -d "$PROJECT_DIR" ] && rmdir "$PROJECT_DIR" 2>/dev/null || true
+                          mkdir -p "$(dirname $PROJECT_DIR)"
+                          git clone https://github.com/${{ github.repository }}.git "$PROJECT_DIR"
+                          cd "$PROJECT_DIR"
                           git checkout ${{ github.ref_name }}
                         fi
                       else
-                        cd ${{ env.PROJECT_PATH }}
+                        cd "$PROJECT_DIR"
                         echo "📥 Pulling latest changes..."
                         git fetch origin
                         git checkout ${{ github.ref_name }}
@@ -165,7 +171,8 @@ jobs:
                       fi
 
                   deploy-command: |
-                      cd ${{ env.PROJECT_PATH }}
+                      PROJECT_DIR="${HOME}/sullivan"
+                      cd "$PROJECT_DIR"
 
                       echo "📂 Current directory: $(pwd)"
                       echo "🌿 Git branch: $(git branch --show-current)"
@@ -186,7 +193,8 @@ jobs:
                       fi
 
                   post-deploy-command: |
-                      cd ${{ env.PROJECT_PATH }}
+                      PROJECT_DIR="${HOME}/sullivan"
+                      cd "$PROJECT_DIR"
 
                       echo ""
                       echo "📊 Service Status:"
