@@ -164,6 +164,69 @@ jobs:
                       # Ensure run.sh is executable
                       chmod +x ./run.sh 2>/dev/null || true
 
+                      # Configure firewall for Tailscale access from Freddy
+                      echo "🔥 Configuring firewall for Tailscale..."
+                      FREDDY_IP="${{ secrets.FREDDY_TAILSCALE_IP }}"
+
+                      # Service ports for nginx proxy from Freddy
+                      SERVICE_PORTS=(
+                        22      # SSH
+                        8096    # Emby
+                        8920    # Emby HTTPS
+                        8097    # Jellyfin
+                        32400   # Plex
+                        8080    # qBittorrent
+                        9117    # Jackett
+                        8191    # Flaresolverr
+                        8989    # Sonarr
+                        7878    # Radarr
+                        8686    # Lidarr
+                        8082    # Calibre
+                        8083    # Calibre Desktop
+                        8084    # Calibre-Web
+                        5452    # Filebot
+                        8998    # YouTube-DL
+                        8200    # Duplicati
+                        9925    # Mealie
+                        9283    # Grocy
+                        8090    # Wiki.js
+                      )
+
+                      # Enable UFW if not already enabled
+                      if command -v ufw &> /dev/null; then
+                        sudo ufw --force enable 2>/dev/null || true
+
+                        # Allow SSH from anywhere (fallback)
+                        sudo ufw allow 22/tcp comment 'SSH' 2>/dev/null || true
+
+                        # Allow Tailscale interface
+                        sudo ufw allow in on tailscale0 comment 'Tailscale' 2>/dev/null || true
+
+                        # Allow all service ports from Freddy's Tailscale IP
+                        if [ -n "$FREDDY_IP" ]; then
+                          for port in "${SERVICE_PORTS[@]}"; do
+                            sudo ufw allow from "$FREDDY_IP" to any port "$port" proto tcp comment "Sullivan service from Freddy" 2>/dev/null || true
+                          done
+                          echo "  ✓ Firewall rules added for Freddy ($FREDDY_IP)"
+                        else
+                          echo "  ⚠️ FREDDY_TAILSCALE_IP not set, allowing Tailscale interface only"
+                        fi
+
+                        # Allow Plex additional ports
+                        sudo ufw allow 32410:32414/tcp comment 'Plex' 2>/dev/null || true
+                        sudo ufw allow 32410:32414/udp comment 'Plex' 2>/dev/null || true
+                        sudo ufw allow 1900/udp comment 'Plex DLNA' 2>/dev/null || true
+
+                        # Allow qBittorrent torrent port
+                        sudo ufw allow 60000/tcp comment 'qBittorrent' 2>/dev/null || true
+                        sudo ufw allow 60000/udp comment 'qBittorrent' 2>/dev/null || true
+
+                        sudo ufw reload 2>/dev/null || true
+                        echo "  ✓ Firewall configured"
+                      else
+                        echo "  ⚠️ UFW not installed, skipping firewall configuration"
+                      fi
+
                       # Use run.sh to generate .env file with secrets if missing
                       if [ ! -f .env ]; then
                         echo "📝 Generating .env file using run.sh..."
