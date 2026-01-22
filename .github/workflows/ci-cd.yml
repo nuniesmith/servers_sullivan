@@ -94,10 +94,6 @@ jobs:
               id: deploy
               if: steps.tailscale.outputs.connected == 'true'
               uses: nuniesmith/actions/.github/actions/ssh-deploy@main
-              env:
-                  SONARR_API_KEY: ${{ secrets.SONARR_API_KEY }}
-                  RADARR_API_KEY: ${{ secrets.RADARR_API_KEY }}
-                  LIDARR_API_KEY: ${{ secrets.LIDARR_API_KEY }}
               with:
                   host: ${{ secrets.SULLIVAN_TAILSCALE_IP }}
                   port: ${{ secrets.SSH_PORT || '22' }}
@@ -168,25 +164,40 @@ jobs:
                       # Ensure run.sh is executable
                       chmod +x ./run.sh 2>/dev/null || true
 
+                      # Use run.sh to generate .env file with secrets if missing
+                      if [ ! -f .env ]; then
+                        echo "📝 Generating .env file using run.sh..."
+                        ./run.sh secrets 2>/dev/null || true
+                      fi
+
                       # Load environment variables
                       if [ -f .env ]; then
                         set -a && source .env && set +a
                         echo "✓ Environment loaded"
                       fi
 
-                      # Inject API keys from GitHub secrets into .env
-                      echo "🔑 Configuring API keys..."
-                      if [ -n "$SONARR_API_KEY" ]; then
-                        sed -i "s|^SONARR_API_KEY=.*|SONARR_API_KEY=$SONARR_API_KEY|" .env || echo "SONARR_API_KEY=$SONARR_API_KEY" >> .env
+                      # Inject API keys from GitHub secrets
+                      echo "🔑 Configuring API keys from GitHub secrets..."
+                      SONARR_KEY="${{ secrets.SONARR_API_KEY }}"
+                      RADARR_KEY="${{ secrets.RADARR_API_KEY }}"
+                      LIDARR_KEY="${{ secrets.LIDARR_API_KEY }}"
+                      DISCORD_KEY="${{ secrets.DOPLARR_TOKEN }}"
+
+                      if [ -n "$SONARR_KEY" ] && [ "$SONARR_KEY" != "" ]; then
+                        sed -i "s|^SONARR_API_KEY=.*|SONARR_API_KEY=${SONARR_KEY}|" .env
                         echo "  ✓ Sonarr API key configured"
                       fi
-                      if [ -n "$RADARR_API_KEY" ]; then
-                        sed -i "s|^RADARR_API_KEY=.*|RADARR_API_KEY=$RADARR_API_KEY|" .env || echo "RADARR_API_KEY=$RADARR_API_KEY" >> .env
+                      if [ -n "$RADARR_KEY" ] && [ "$RADARR_KEY" != "" ]; then
+                        sed -i "s|^RADARR_API_KEY=.*|RADARR_API_KEY=${RADARR_KEY}|" .env
                         echo "  ✓ Radarr API key configured"
                       fi
-                      if [ -n "$LIDARR_API_KEY" ]; then
-                        sed -i "s|^LIDARR_API_KEY=.*|LIDARR_API_KEY=$LIDARR_API_KEY|" .env || echo "LIDARR_API_KEY=$LIDARR_API_KEY" >> .env
+                      if [ -n "$LIDARR_KEY" ] && [ "$LIDARR_KEY" != "" ]; then
+                        sed -i "s|^LIDARR_API_KEY=.*|LIDARR_API_KEY=${LIDARR_KEY}|" .env
                         echo "  ✓ Lidarr API key configured"
+                      fi
+                      if [ -n "$DISCORD_KEY" ] && [ "$DISCORD_KEY" != "" ]; then
+                        sed -i "s|^DISCORD_TOKEN=.*|DISCORD_TOKEN=${DISCORD_KEY}|" .env
+                        echo "  ✓ Discord token configured"
                       fi
 
                   deploy-command: |
