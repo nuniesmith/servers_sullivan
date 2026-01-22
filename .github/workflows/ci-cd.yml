@@ -94,6 +94,10 @@ jobs:
               id: deploy
               if: steps.tailscale.outputs.connected == 'true'
               uses: nuniesmith/actions/.github/actions/ssh-deploy@main
+              env:
+                  SONARR_API_KEY: ${{ secrets.SONARR_API_KEY }}
+                  RADARR_API_KEY: ${{ secrets.RADARR_API_KEY }}
+                  LIDARR_API_KEY: ${{ secrets.LIDARR_API_KEY }}
               with:
                   host: ${{ secrets.SULLIVAN_TAILSCALE_IP }}
                   port: ${{ secrets.SSH_PORT || '22' }}
@@ -168,6 +172,21 @@ jobs:
                       if [ -f .env ]; then
                         set -a && source .env && set +a
                         echo "✓ Environment loaded"
+                      fi
+
+                      # Inject API keys from GitHub secrets into .env
+                      echo "🔑 Configuring API keys..."
+                      if [ -n "$SONARR_API_KEY" ]; then
+                        sed -i "s|^SONARR_API_KEY=.*|SONARR_API_KEY=$SONARR_API_KEY|" .env || echo "SONARR_API_KEY=$SONARR_API_KEY" >> .env
+                        echo "  ✓ Sonarr API key configured"
+                      fi
+                      if [ -n "$RADARR_API_KEY" ]; then
+                        sed -i "s|^RADARR_API_KEY=.*|RADARR_API_KEY=$RADARR_API_KEY|" .env || echo "RADARR_API_KEY=$RADARR_API_KEY" >> .env
+                        echo "  ✓ Radarr API key configured"
+                      fi
+                      if [ -n "$LIDARR_API_KEY" ]; then
+                        sed -i "s|^LIDARR_API_KEY=.*|LIDARR_API_KEY=$LIDARR_API_KEY|" .env || echo "LIDARR_API_KEY=$LIDARR_API_KEY" >> .env
+                        echo "  ✓ Lidarr API key configured"
                       fi
 
                   deploy-command: |
