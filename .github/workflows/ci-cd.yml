@@ -110,13 +110,36 @@ jobs:
                       # Handle git repository setup
                       if [ ! -d "${{ env.PROJECT_PATH }}/.git" ]; then
                         if [ -d "${{ env.PROJECT_PATH }}" ]; then
-                          echo "📁 Directory exists but is not a git repo - initializing..."
+                          echo "📁 Directory exists but is not a git repo - converting..."
                           cd ${{ env.PROJECT_PATH }}
+
+                          # Preserve local files that shouldn't be overwritten
+                          BACKUP_DIR=$(mktemp -d)
+                          echo "📦 Backing up local files to $BACKUP_DIR..."
+                          [ -f .env ] && cp .env "$BACKUP_DIR/.env"
+                          [ -d services ] && cp -r services "$BACKUP_DIR/services"
+
+                          # Initialize git and fetch from remote
                           git init
                           git remote add origin https://github.com/${{ github.repository }}.git
                           git fetch origin
-                          git checkout -f ${{ github.ref_name }}
+
+                          # Reset to match remote (overwrites tracked files only)
+                          git reset --hard origin/${{ github.ref_name }}
+                          git branch -M ${{ github.ref_name }}
                           git branch --set-upstream-to=origin/${{ github.ref_name }} ${{ github.ref_name }}
+
+                          # Restore preserved local files
+                          echo "📦 Restoring local files..."
+                          [ -f "$BACKUP_DIR/.env" ] && cp "$BACKUP_DIR/.env" .env && echo "  ✓ Restored .env"
+                          if [ -d "$BACKUP_DIR/services" ]; then
+                            # Merge services directory (preserve local configs)
+                            cp -rn "$BACKUP_DIR/services"/* services/ 2>/dev/null || true
+                            echo "  ✓ Merged services configs"
+                          fi
+                          rm -rf "$BACKUP_DIR"
+
+                          echo "✓ Git repository initialized from existing directory"
                         else
                           echo "📥 First deployment - cloning repository..."
                           mkdir -p $(dirname ${{ env.PROJECT_PATH }})
