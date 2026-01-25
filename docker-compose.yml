@@ -281,7 +281,7 @@ services:
             - ${MEDIA_PATH:-/mnt/media}:/media
             - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu
             - ${MEDIA_PATH_AUDIOBOOKS:-/mnt/media/books/audiobooks}:/audiobooks
-            - ${MEDIA_PATH_EBOOKS:-/mnt/media/ebooks}:/ebooks
+            - ${MEDIA_PATH_EBOOKS:-/mnt/media/books/ebooks}:/ebooks
         ports:
             - "8080:8080"
             - "60000:60000"
