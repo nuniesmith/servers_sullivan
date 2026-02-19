@@ -46,7 +46,7 @@ permissions:
 
 env:
     SERVER_NAME: sullivan
-    PROJECT_PATH: ~/sullivan
+    PROJECT_PATH: sullivan
     DOMAIN: sullivan.7gram.xyz
     # Note: Sullivan services are accessed via Freddy's nginx reverse proxy
     # DNS records point to Freddy's Tailscale IP, which proxies to Sullivan over Tailscale
@@ -102,7 +102,6 @@ jobs:
                   project-path: ${{ env.PROJECT_PATH }}
                   git-pull: false
                   git-branch: ${{ github.ref_name }}
-                  docker-pull: false
                   docker-prune: false
                   pre-deploy-command: |
                       echo "🎬 Deploying to Sullivan server..."
@@ -317,7 +316,7 @@ jobs:
               if: always() && steps.deploy.outcome == 'success'
               uses: nuniesmith/actions/.github/actions/health-check@main
               with:
-                  containers: emby,jellyfin,plex,sonarr,radarr,lidarr,qbittorrent,jackett
+                  containers: emby jellyfin plex sonarr radarr lidarr qbittorrent jackett
                   ssh-host: ${{ secrets.SULLIVAN_TAILSCALE_IP }}
                   ssh-port: ${{ secrets.SSH_PORT || '22' }}
                   ssh-user: ${{ secrets.SSH_USER || 'actions' }}
