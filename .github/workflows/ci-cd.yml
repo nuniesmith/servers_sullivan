@@ -270,19 +270,17 @@ jobs:
                       echo "🌿 Git branch: $(git branch --show-current)"
                       echo "📝 Latest commit: $(git log -1 --oneline)"
 
-                      # Deploy using run.sh
+                      # Stop existing services
+                      echo "🐳 Stopping existing services..."
                       if [ -x "./run.sh" ]; then
-                        echo "🐳 Pulling latest images..."
-                        docker compose pull --ignore-pull-failures 2>&1 || true
-                        echo "🐳 Stopping existing services..."
                         ./run.sh stop 2>/dev/null || true
-                        echo "🐳 Starting all services..."
-                        ./run.sh start 2>&1
                       else
-                        echo "⚠️ run.sh not found, using docker compose directly"
-                        docker compose pull --ignore-pull-failures
-                        docker compose up -d --remove-orphans
+                        docker compose down 2>/dev/null || true
                       fi
+
+                      # Pull latest images and start all services in one pass
+                      echo "🚀 Pulling images & starting all services..."
+                      docker compose up -d --pull always --remove-orphans
 
                   post-deploy-command: |
                       PROJECT_DIR="${HOME}/sullivan"
