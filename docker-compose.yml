@@ -658,21 +658,6 @@ services:
             start_period: 40s
         networks:
             - utilities
-            - PGID=${PGID:-1000}
-            - TZ=${TZ:-America/Toronto}
-
-            - "22000:22000/tcp"
-            - "22000:22000/udp"
-            - "21027:21027/udp"
-        restart: always
-        healthcheck:
-            test: ["CMD", "curl", "-f", "http://localhost:8384"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
-            start_period: 40s
-        networks:
-            - utilities
 
     # wiki.js - knowledge management and documentation
     wiki:
