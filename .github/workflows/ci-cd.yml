@@ -330,7 +330,7 @@ jobs:
             # DISCORD NOTIFICATION
             # ======================================================================
             - name: 📣 Notify deployment
-              if: always() && (inputs.notify_discord != false)
+              if: always() && (github.event_name != 'workflow_dispatch' || inputs.notify_discord != false)
               uses: nuniesmith/actions/.github/actions/discord-notify@main
               continue-on-error: true
               with:
