@@ -270,13 +270,11 @@ jobs:
                       echo "🌿 Git branch: $(git branch --show-current)"
                       echo "📝 Latest commit: $(git log -1 --oneline)"
 
-                      # Stop existing services
+                      # Stop and remove existing containers + networks
+                      # (run.sh stop only stops containers without removing them,
+                      #  causing name conflicts on docker compose up)
                       echo "🐳 Stopping existing services..."
-                      if [ -x "./run.sh" ]; then
-                        ./run.sh stop 2>/dev/null || true
-                      else
-                        docker compose down 2>/dev/null || true
-                      fi
+                      docker compose down --remove-orphans 2>/dev/null || true
 
                       # Pull latest images and start all services in one pass
                       echo "🚀 Pulling images & starting all services..."
