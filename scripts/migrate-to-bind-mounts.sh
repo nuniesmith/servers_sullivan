@@ -40,7 +40,6 @@ SERVICES=(
     "duplicati"
     "mealie"
     "grocy"
-    "syncthing"
     "wiki"
 )
 

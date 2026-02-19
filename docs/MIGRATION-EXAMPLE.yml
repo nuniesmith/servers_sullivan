@@ -92,10 +92,6 @@ services:
     volumes:
       - ./services/grocy/config:/config        # CHANGED: bind mount
       
-  syncthing:
-    volumes:
-      - ./services/syncthing/config:/config    # CHANGED: bind mount
-      
   wiki:
     volumes:
       - ./services/wiki/config:/config         # CHANGED: bind mount
@@ -136,7 +132,6 @@ volumes:
   # duplicati_data:     # ❌ Remove
   # mealie_data:        # ❌ Remove
   # grocy_data:         # ❌ Remove
-  # syncthing_data:     # ❌ Remove
   # wiki_data:          # ❌ Remove
   # portainer_data:     # ❌ Remove
 

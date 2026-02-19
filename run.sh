@@ -718,7 +718,6 @@ show_endpoints() {
     echo "  Wiki.js:         http://localhost:8090"
     echo "  Grocy:           http://localhost:9283"
     echo "  Duplicati:       http://localhost:8200"
-    echo "  Syncthing:       http://localhost:8384"
     echo "  YouTube DL:      http://localhost:8998"
     echo ""
 }

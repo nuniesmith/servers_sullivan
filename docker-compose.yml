@@ -28,7 +28,6 @@ volumes:
     mealie_data:
     grocy_data:
     portainer_data:
-    syncthing_data:
     nextcloud_data:
     wiki_data:
 
@@ -659,23 +658,9 @@ services:
             start_period: 40s
         networks:
             - utilities
-
-    # syncthing - file synchronization
-    syncthing:
-        image: lscr.io/linuxserver/syncthing:latest
-        container_name: syncthing_sullivan
-        environment:
-            - PUID=${PUID:-1000}
             - PGID=${PGID:-1000}
             - TZ=${TZ:-America/Toronto}
-        volumes:
-            # DATA: Application data
-            - syncthing_data:/config
-            # SYNC: Directories to sync (media content)
-            - ${SYNCTHING_MEDIA_PATH:-/mnt/media}:/sync/media
-            - ${SYNCTHING_DOWNLOADS_PATH:-/mnt/media/qbittorrent}:/sync/downloads
-        ports:
-            - "8384:8384"
+
             - "22000:22000/tcp"
             - "22000:22000/udp"
             - "21027:21027/udp"
