@@ -7,9 +7,11 @@ volumes:
     emby_data:
     emby_cache:
     emby_backup:
-        type: local
-        o: bind
-        device: ${BACKUP_DESTINATION:-/mnt/media/backup/emby}
+        driver: local
+        driver_opts:
+            type: none
+            o: bind
+            device: ${BACKUP_DESTINATION:-/mnt/media/backup/emby}
     jellyfin_data:
     jellyfin_cache:
     plex_data:
