@@ -72,6 +72,8 @@ services:
         image: emby/embyserver
         container_name: emby
         runtime: nvidia
+        security_opt:
+            - apparmor:unconfined
         deploy:
             resources:
                 reservations:
