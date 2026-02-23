@@ -6,6 +6,10 @@ volumes:
     # Media Service volumes
     emby_data:
     emby_cache:
+    emby_backup:
+        type: local
+        o: bind
+        device: ${BACKUP_DESTINATION:-/mnt/media/backup/emby}
     jellyfin_data:
     jellyfin_cache:
     plex_data:
@@ -91,7 +95,7 @@ services:
             - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos
             - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu
             # BACKUP: For backups
-            - ${BACKUP_DESTINATION:-/mnt/media/backup}:/backup
+            - emby_backup:/backup
         devices:
             - /dev/dri:/dev/dri
         ports:
