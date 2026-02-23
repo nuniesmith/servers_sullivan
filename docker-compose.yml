@@ -80,8 +80,8 @@ services:
                           count: all
                           capabilities: [compute, utility, video]
         environment:
-            - PUID=${PUID:-1000}
-            - PGID=${PGID:-1000}
+            - PUID=${PUID:-1001}
+            - PGID=${PGID:-1001}
             - TZ=${TZ:-America/Toronto}
             - LIBVA_DRIVER_NAME=${LIBVA_DRIVER_NAME:-iHD}
         volumes:
