@@ -6,8 +6,8 @@
 # =============================================================================
 x-common-env: &common-env
     TZ: ${TZ:-America/Toronto}
-    PUID: ${PUID:-1000}
-    PGID: ${PGID:-100}
+    PUID: ${PUID:-1001}
+    PGID: ${PGID:-1001}
 
 x-logging: &default-logging
     driver: json-file
@@ -511,7 +511,7 @@ services:
             # DOWNLOADS: Working directories
             - ${MEDIA_PATH:-/mnt/media}:/media
             - ${DOWNLOAD_PATH_COMPLETE:-/mnt/media/qbittorrent/complete}:/complete
-        user: ${PUID:-1000}:${PGID:-100}
+        user: ${PUID:-1001}:${PGID:-1001}
         environment:
             TZ: ${TZ:-America/Toronto}
             UN_DEBUG: "false"
