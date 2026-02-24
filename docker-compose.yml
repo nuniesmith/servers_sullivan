@@ -68,7 +68,7 @@ volumes:
     mealie_data:
     grocy_data:
     wiki_data:
-    overseerr_data:
+    seerr_data:
     tdarr_server_data:
     tdarr_configs:
     recyclarr_data:
@@ -564,14 +564,14 @@ services:
                 limits:
                     memory: 512M
 
-    # overseerr - media request management (web UI for friends/family)
-    overseerr:
-        image: lscr.io/linuxserver/overseerr:latest
-        container_name: overseerr
+    # seerr - media request management (web UI for friends/family)
+    seerr:
+        image: seerr/seerr:latest
+        container_name: seerr
         environment:
             <<: *common-env
         volumes:
-            - overseerr_data:/config
+            - seerr_data:/app/config
         ports:
             - "5055:5055"
         restart: always
