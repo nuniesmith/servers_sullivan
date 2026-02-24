@@ -171,12 +171,12 @@ services:
             - jellyfin_cache:/cache
             # TRANSCODE: Temporary
             - /tmp:/transcode
-            # MEDIA: Read-only media files
-            - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies:ro
-            - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows:ro
-            - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music:ro
-            - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos:ro
-            - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu:ro
+            # MEDIA: Read-write media files for full media management
+            - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies:rw
+            - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows:rw
+            - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music:rw
+            - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos:rw
+            - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu:rw
         devices:
             - /dev/dri:/dev/dri
         ports:
@@ -216,12 +216,12 @@ services:
             - plex_cache:/cache
             # TRANSCODE: Temporary
             - /tmp:/transcode
-            # MEDIA: Read-only media files
-            - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies:ro
-            - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows:ro
-            - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music:ro
-            - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos:ro
-            - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu:ro
+            # MEDIA: Read-write media files for full media management
+            - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies:rw
+            - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows:rw
+            - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music:rw
+            - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos:rw
+            - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu:rw
         devices:
             - /dev/dri:/dev/dri
         ports:
@@ -276,8 +276,8 @@ services:
         volumes:
             # DATA: Application data
             - calibre_web_data:/data
-            # MEDIA: Read-only books
-            - ${MEDIA_PATH_BOOKS:-/mnt/media/books}:/books:ro
+            # MEDIA: Read-write books for full media management
+            - ${MEDIA_PATH_BOOKS:-/mnt/media/books}:/books:rw
         ports:
             - "8084:8083"
         restart: always
@@ -628,6 +628,8 @@ services:
             - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies
             - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows
             - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music
+            - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos
+            - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu
         ports:
             - "8265:8265"
             - "8266:8266"
@@ -866,7 +868,14 @@ services:
             - ytdl_mongodb:/data/db
         restart: always
         healthcheck:
-            test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok", "--quiet"]
+            test:
+                [
+                    "CMD",
+                    "mongosh",
+                    "--eval",
+                    "db.runCommand('ping').ok",
+                    "--quiet",
+                ]
             <<: *healthcheck-defaults
             start_period: 40s
         networks:
