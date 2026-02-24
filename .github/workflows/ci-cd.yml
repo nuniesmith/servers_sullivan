@@ -4,7 +4,8 @@
 # Home media server running Emby, Jellyfin, Plex, Sonarr, Radarr, etc.
 # Repository: nuniesmith/sullivan
 #
-# Services: emby, jellyfin, plex, sonarr, radarr, lidarr, jackett, qbittorrent, calibre
+# Services: emby, jellyfin, plex, sonarr, radarr, lidarr, prowlarr, bazarr, qbittorrent,
+#           calibre, overseerr, tdarr, recyclarr
 #
 # Features:
 #   - Deployment via Tailscale + SSH
@@ -175,7 +176,11 @@ jobs:
                         8097    # Jellyfin
                         32400   # Plex
                         8080    # qBittorrent
-                        9117    # Jackett
+                        9696    # Prowlarr
+                        6767    # Bazarr
+                        5055    # Overseerr
+                        8265    # Tdarr Web UI
+                        8266    # Tdarr Server
                         8191    # Flaresolverr
                         8989    # Sonarr
                         7878    # Radarr
@@ -243,7 +248,7 @@ jobs:
                       SONARR_KEY="${{ secrets.SONARR_API_KEY }}"
                       RADARR_KEY="${{ secrets.RADARR_API_KEY }}"
                       LIDARR_KEY="${{ secrets.LIDARR_API_KEY }}"
-                      DISCORD_KEY="${{ secrets.DOPLARR_TOKEN }}"
+                      PROWLARR_KEY="${{ secrets.PROWLARR_API_KEY }}"
 
                       if [ -n "$SONARR_KEY" ] && [ "$SONARR_KEY" != "" ]; then
                         sed -i "s|^SONARR_API_KEY=.*|SONARR_API_KEY=${SONARR_KEY}|" .env
@@ -257,9 +262,9 @@ jobs:
                         sed -i "s|^LIDARR_API_KEY=.*|LIDARR_API_KEY=${LIDARR_KEY}|" .env
                         echo "  ✓ Lidarr API key configured"
                       fi
-                      if [ -n "$DISCORD_KEY" ] && [ "$DISCORD_KEY" != "" ]; then
-                        sed -i "s|^DOPLARR_TOKEN=.*|DOPLARR_TOKEN=${DISCORD_KEY}|" .env
-                        echo "  ✓ Doplarr token configured"
+                      if [ -n "$PROWLARR_KEY" ] && [ "$PROWLARR_KEY" != "" ]; then
+                        sed -i "s|^PROWLARR_API_KEY=.*|PROWLARR_API_KEY=${PROWLARR_KEY}|" .env
+                        echo "  ✓ Prowlarr API key configured"
                       fi
 
                   deploy-command: |
@@ -312,7 +317,7 @@ jobs:
               if: always() && steps.deploy.outcome == 'success'
               uses: nuniesmith/actions/.github/actions/health-check@main
               with:
-                  containers: emby jellyfin plex sonarr radarr lidarr qbittorrent jackett
+                  containers: emby jellyfin plex sonarr radarr lidarr prowlarr bazarr qbittorrent overseerr tdarr
                   ssh-host: ${{ secrets.SULLIVAN_TAILSCALE_IP }}
                   ssh-port: ${{ secrets.SSH_PORT || '22' }}
                   ssh-user: ${{ secrets.SSH_USER || 'actions' }}
