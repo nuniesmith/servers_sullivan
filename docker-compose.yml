@@ -209,8 +209,8 @@ services:
             <<: *common-env
             VERSION: docker
             LIBVA_DRIVER_NAME: ${LIBVA_DRIVER_NAME:-iHD}
+            PLEX_CLAIM: claim-zTtSxcWvxoUzxPD5FC1V
         volumes:
-            - PLEX_CLAIM=claim-MxgdyY-4ZcuM3zVLcJDW
             # DATA: Database, metadata, cache
             - plex_data:/config
             - plex_cache:/cache
