@@ -28,12 +28,12 @@ x-nvidia-deploy: &nvidia-deploy
                   count: all
                   capabilities: [compute, utility, video]
 
-x-media-volumes-ro: &media-volumes-ro
-    - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies:ro
-    - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows:ro
-    - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music:ro
-    - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos:ro
-    - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu:ro
+x-media-volumes-rw: &media-volumes-rw
+    - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies:rw
+    - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows:rw
+    - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music:rw
+    - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos:rw
+    - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu:rw
 
 # Named volumes for data/cache/databases only
 volumes:
