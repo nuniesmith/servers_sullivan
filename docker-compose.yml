@@ -1,6 +1,40 @@
 # Docker Compose for SULLIVAN - Media & Intensive Services
 # Powerful server handling media, downloads, AI, and user applications
 
+# =============================================================================
+# YAML ANCHORS - Reusable configuration blocks
+# =============================================================================
+x-common-env: &common-env
+    TZ: ${TZ:-America/Toronto}
+    PUID: ${PUID:-1000}
+    PGID: ${PGID:-100}
+
+x-logging: &default-logging
+    driver: json-file
+    options:
+        max-size: "10m"
+        max-file: "3"
+
+x-healthcheck-defaults: &healthcheck-defaults
+    interval: 30s
+    timeout: 10s
+    retries: 3
+
+x-nvidia-deploy: &nvidia-deploy
+    resources:
+        reservations:
+            devices:
+                - driver: nvidia
+                  count: all
+                  capabilities: [compute, utility, video]
+
+x-media-volumes-ro: &media-volumes-ro
+    - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies:ro
+    - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows:ro
+    - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music:ro
+    - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos:ro
+    - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu:ro
+
 # Named volumes for data/cache/databases only
 volumes:
     # Media Service volumes
@@ -23,28 +57,25 @@ volumes:
     sonarr_data:
     radarr_data:
     lidarr_data:
-    jackett_data:
+    prowlarr_data:
     qbittorrent_data:
+    bazarr_data:
 
     # Utility volumes
     filebot_data:
-    homarr_data:
     duplicati_data:
     ytdl_data:
     mealie_data:
     grocy_data:
-    portainer_data:
-    nextcloud_data:
     wiki_data:
+    overseerr_data:
+    tdarr_server_data:
+    tdarr_configs:
+    recyclarr_data:
 
     # Database volumes
     ytdl_mongodb:
-    nextcloud_mysql:
     wiki_postgres:
-
-    # Monitoring/System volumes
-    watchtower_data:
-    datadog_data:
 
 # Custom networks for service isolation
 networks:
@@ -67,7 +98,8 @@ services:
     # =============================================================================
     # MEDIA SERVICES
     # =============================================================================
-    # emby
+
+    # emby - primary media server for movies, TV shows, and live TV
     emby:
         image: emby/embyserver
         container_name: emby
@@ -75,24 +107,25 @@ services:
         security_opt:
             - apparmor:unconfined
         deploy:
+            <<: *nvidia-deploy
             resources:
+                limits:
+                    memory: 4G
                 reservations:
                     devices:
                         - driver: nvidia
                           count: all
                           capabilities: [compute, utility, video]
         environment:
-            - PUID=${PUID:-1001}
-            - PGID=${PGID:-1001}
-            - TZ=${TZ:-America/Toronto}
-            - LIBVA_DRIVER_NAME=${LIBVA_DRIVER_NAME:-iHD}
+            <<: *common-env
+            LIBVA_DRIVER_NAME: ${LIBVA_DRIVER_NAME:-iHD}
         volumes:
             # DATA: Database, metadata, cache
             - emby_data:/config
             - emby_cache:/cache
             # TRANSCODE: Temporary
             - /tmp:/transcode
-            # MEDIA: media files
+            # MEDIA: media files (read-write for live TV recordings)
             - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies
             - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows
             - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music
@@ -106,11 +139,10 @@ services:
             - "8096:8096"
             - "8920:8920"
         restart: always
+        logging: *default-logging
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
+            <<: *healthcheck-defaults
             start_period: 90s
         networks:
             - media
@@ -119,19 +151,20 @@ services:
     jellyfin:
         image: lscr.io/linuxserver/jellyfin:latest
         container_name: jellyfin
-        runtime: runc
+        runtime: nvidia
         deploy:
+            <<: *nvidia-deploy
             resources:
+                limits:
+                    memory: 3G
                 reservations:
                     devices:
                         - driver: nvidia
                           count: all
                           capabilities: [compute, utility, video]
         environment:
-            - PUID=${PUID:-1001}
-            - PGID=${PGID:-1001}
-            - TZ=${TZ:-America/Toronto}
-            - LIBVA_DRIVER_NAME=${LIBVA_DRIVER_NAME:-iHD}
+            <<: *common-env
+            LIBVA_DRIVER_NAME: ${LIBVA_DRIVER_NAME:-iHD}
         volumes:
             # DATA: Database, metadata, cache
             - jellyfin_data:/config
@@ -147,35 +180,35 @@ services:
         devices:
             - /dev/dri:/dev/dri
         ports:
-            - "8097:8096" # Changed from 8096 to avoid conflict with Emby
+            - "8097:8096"
         restart: always
+        logging: *default-logging
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
+            <<: *healthcheck-defaults
             start_period: 90s
         networks:
             - media
 
-    # plex
+    # plex - music streaming (Plexamp) + lifetime Plex Pass
     plex:
         image: lscr.io/linuxserver/plex:latest
         container_name: plex
         runtime: nvidia
         deploy:
+            <<: *nvidia-deploy
             resources:
+                limits:
+                    memory: 4G
                 reservations:
                     devices:
                         - driver: nvidia
                           count: all
                           capabilities: [compute, utility, video]
         environment:
-            - PUID=${PUID:-1001}
-            - PGID=${PGID:-1001}
-            - TZ=${TZ:-America/Toronto}
-            - VERSION=docker
-            - LIBVA_DRIVER_NAME=${LIBVA_DRIVER_NAME:-iHD}
+            <<: *common-env
+            VERSION: docker
+            LIBVA_DRIVER_NAME: ${LIBVA_DRIVER_NAME:-iHD}
         volumes:
             # DATA: Database, metadata, cache
             - plex_data:/config
@@ -200,11 +233,10 @@ services:
             - "32414:32414"
             - "32469:32469"
         restart: always
+        logging: *default-logging
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:32400/identity"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
+            <<: *healthcheck-defaults
             start_period: 90s
         networks:
             - media
@@ -216,9 +248,7 @@ services:
         security_opt:
             - seccomp:unconfined
         environment:
-            - PUID=${PUID:-1001}
-            - PGID=${PGID:-1001}
-            - TZ=${TZ:-America/Toronto}
+            <<: *common-env
         volumes:
             # DATA: Database and converted files
             - calibre_data:/config
@@ -228,11 +258,10 @@ services:
             - "8082:8080"
             - "8083:8081"
         restart: always
+        logging: *default-logging
         healthcheck:
             test: ["CMD-SHELL", "pgrep -f calibre || exit 1"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
+            <<: *healthcheck-defaults
             start_period: 60s
         networks:
             - books
@@ -242,9 +271,7 @@ services:
         image: lscr.io/linuxserver/calibre-web:latest
         container_name: calibre-web
         environment:
-            - PUID=${PUID:-1001}
-            - PGID=${PGID:-1001}
-            - TZ=${TZ:-America/Toronto}
+            <<: *common-env
         volumes:
             # DATA: Application data
             - calibre_web_data:/data
@@ -253,11 +280,10 @@ services:
         ports:
             - "8084:8083"
         restart: always
+        logging: *default-logging
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:8083"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
+            <<: *healthcheck-defaults
             start_period: 40s
         networks:
             - books
@@ -271,10 +297,8 @@ services:
         image: lscr.io/linuxserver/qbittorrent:latest
         container_name: qbittorrent
         environment:
-            - PUID=${PUID:-1001}
-            - PGID=${PGID:-1001}
-            - TZ=${TZ:-America/Toronto}
-            - WEBUI_PORT=8080
+            <<: *common-env
+            WEBUI_PORT: 8080
         volumes:
             # DATA: Application data and cache
             - qbittorrent_data:/config
@@ -293,68 +317,72 @@ services:
             - "8080:8080"
             - "60000:60000"
         restart: always
+        logging: *default-logging
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:8080"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
+            <<: *healthcheck-defaults
             start_period: 60s
         networks:
             - download
+        deploy:
+            resources:
+                limits:
+                    memory: 2G
 
-    # jackett
-    jackett:
-        image: lscr.io/linuxserver/jackett:latest
-        container_name: jackett
+    # prowlarr - indexer manager (replaces Jackett)
+    # Native *arr integration - syncs indexers to Sonarr/Radarr/Lidarr automatically
+    prowlarr:
+        image: lscr.io/linuxserver/prowlarr:latest
+        container_name: prowlarr
         environment:
-            - PUID=${PUID:-1001}
-            - PGID=${PGID:-1001}
-            - TZ=${TZ:-America/Toronto}
-            - AUTO_UPDATE=true
+            <<: *common-env
         volumes:
-            # DATA: Database and cache
-            - jackett_data:/config
+            - prowlarr_data:/config
         ports:
-            - "9117:9117"
+            - "9696:9696"
         restart: always
+        logging: *default-logging
         healthcheck:
-            test: ["CMD", "curl", "-f", "http://localhost:9117/health"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
+            test: ["CMD", "curl", "-f", "http://localhost:9696/ping"]
+            <<: *healthcheck-defaults
             start_period: 40s
         networks:
             - download
+        deploy:
+            resources:
+                limits:
+                    memory: 512M
 
     # flaresolverr
     flaresolverr:
         image: ghcr.io/flaresolverr/flaresolverr:latest
         container_name: flaresolverr
         environment:
-            - TZ=${TZ:-America/Toronto}
-            - LOG_LEVEL=${FLARESOLVERR_LOG_LEVEL:-info}
-            - LOG_HTML=${FLARESOLVERR_LOG_HTML:-false}
-            - CAPTCHA_SOLVER=${FLARESOLVERR_CAPTCHA_SOLVER:-none}
+            TZ: ${TZ:-America/Toronto}
+            LOG_LEVEL: ${FLARESOLVERR_LOG_LEVEL:-info}
+            LOG_HTML: ${FLARESOLVERR_LOG_HTML:-false}
+            CAPTCHA_SOLVER: ${FLARESOLVERR_CAPTCHA_SOLVER:-none}
         ports:
             - "${FLARESOLVERR_PORT:-8191}:8191"
         restart: always
+        logging: *default-logging
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:8191/health"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
+            <<: *healthcheck-defaults
             start_period: 30s
         networks:
-            - download # Assuming it's used by indexers like Jackett
+            - download
+        deploy:
+            resources:
+                limits:
+                    memory: 1G
 
-    # sonarr
+    # sonarr - TV series management
     sonarr:
         image: lscr.io/linuxserver/sonarr:latest
         container_name: sonarr
         environment:
-            - PUID=${PUID:-1001}
-            - PGID=${PGID:-1001}
-            - TZ=${TZ:-America/Toronto}
+            <<: *common-env
         volumes:
             # DATA: Database and logs
             - sonarr_data:/config
@@ -367,23 +395,27 @@ services:
         ports:
             - "8989:8989"
         restart: always
+        logging: *default-logging
+        depends_on:
+            - qbittorrent
+            - prowlarr
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:8989/ping"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
+            <<: *healthcheck-defaults
             start_period: 60s
         networks:
             - download
+        deploy:
+            resources:
+                limits:
+                    memory: 1G
 
-    # radarr
+    # radarr - movie management
     radarr:
         image: lscr.io/linuxserver/radarr:latest
         container_name: radarr
         environment:
-            - PUID=${PUID:-1001}
-            - PGID=${PGID:-1001}
-            - TZ=${TZ:-America/Toronto}
+            <<: *common-env
         volumes:
             # DATA: Database and logs
             - radarr_data:/config
@@ -396,23 +428,27 @@ services:
         ports:
             - "7878:7878"
         restart: always
+        logging: *default-logging
+        depends_on:
+            - qbittorrent
+            - prowlarr
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:7878/ping"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
+            <<: *healthcheck-defaults
             start_period: 60s
         networks:
             - download
+        deploy:
+            resources:
+                limits:
+                    memory: 1G
 
-    # lidarr
+    # lidarr - music management
     lidarr:
         image: lscr.io/linuxserver/lidarr:latest
         container_name: lidarr
         environment:
-            - PUID=${PUID:-1001}
-            - PGID=${PGID:-1001}
-            - TZ=${TZ:-America/Toronto}
+            <<: *common-env
         volumes:
             # DATA: Database and logs
             - lidarr_data:/config
@@ -424,14 +460,48 @@ services:
         ports:
             - "8686:8686"
         restart: always
+        logging: *default-logging
+        depends_on:
+            - qbittorrent
+            - prowlarr
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:8686/ping"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
+            <<: *healthcheck-defaults
             start_period: 60s
         networks:
             - download
+        deploy:
+            resources:
+                limits:
+                    memory: 1G
+
+    # bazarr - automated subtitle downloads
+    bazarr:
+        image: lscr.io/linuxserver/bazarr:latest
+        container_name: bazarr
+        environment:
+            <<: *common-env
+        volumes:
+            - bazarr_data:/config
+            - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies
+            - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows
+        ports:
+            - "6767:6767"
+        restart: always
+        logging: *default-logging
+        depends_on:
+            - sonarr
+            - radarr
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:6767/ping"]
+            <<: *healthcheck-defaults
+            start_period: 40s
+        networks:
+            - download
+        deploy:
+            resources:
+                limits:
+                    memory: 512M
 
     # unpackerr
     unpackerr:
@@ -441,84 +511,156 @@ services:
             # DOWNLOADS: Working directories
             - ${MEDIA_PATH:-/mnt/media}:/media
             - ${DOWNLOAD_PATH_COMPLETE:-/mnt/media/qbittorrent/complete}:/complete
-        user: ${PUID:-1000}:${PGID:-1000}
+        user: ${PUID:-1000}:${PGID:-100}
         environment:
-            - TZ=${TZ:-America/Toronto}
-            - UN_DEBUG=false
-            - UN_INTERVAL=2m
-            - UN_START_DELAY=1m
-            - UN_RETRY_DELAY=5m
-            - UN_MAX_RETRIES=3
-            - UN_PARALLEL=1
-            - UN_FILE_MODE=0777
-            - UN_DIR_MODE=0777
-            - UN_SONARR_0_URL=http://sonarr:8989
-            - UN_SONARR_0_API_KEY=${SONARR_API_KEY}
-            - UN_SONARR_0_PATHS_0=/complete/tv-sonarr
-            - UN_SONARR_0_PROTOCOLS=torrent
-            - UN_SONARR_0_TIMEOUT=10s
-            - UN_SONARR_0_DELETE_ORIG=false
-            - UN_SONARR_0_DELETE_DELAY=5m
-            - UN_RADARR_0_URL=http://radarr:7878
-            - UN_RADARR_0_API_KEY=${RADARR_API_KEY}
-            - UN_RADARR_0_PATHS_0=/complete/radarr
-            - UN_RADARR_0_PROTOCOLS=torrent
-            - UN_RADARR_0_TIMEOUT=10s
-            - UN_RADARR_0_DELETE_ORIG=false
-            - UN_RADARR_0_DELETE_DELAY=5m
-            - UN_LIDARR_0_URL=http://lidarr:8686
-            - UN_LIDARR_0_API_KEY=${LIDARR_API_KEY}
-            - UN_LIDARR_0_PATHS_0=/complete/lidarr
-            - UN_LIDARR_0_PROTOCOLS=torrent
-            - UN_LIDARR_0_TIMEOUT=10s
-            - UN_LIDARR_0_DELETE_ORIG=false
-            - UN_LIDARR_0_DELETE_DELAY=5m
-            - UN_FOLDER_0_PATH=/complete
-            - UN_FOLDER_0_DELETE_AFTER=10m
-            - UN_FOLDER_0_DELETE_ORIGINAL=false
-            - UN_FOLDER_0_DELETE_FILES=false
-            - UN_FOLDER_0_MOVE_BACK=false
+            TZ: ${TZ:-America/Toronto}
+            UN_DEBUG: "false"
+            UN_INTERVAL: 2m
+            UN_START_DELAY: 1m
+            UN_RETRY_DELAY: 5m
+            UN_MAX_RETRIES: 3
+            UN_PARALLEL: 1
+            UN_FILE_MODE: "0664"
+            UN_DIR_MODE: "0775"
+            UN_SONARR_0_URL: http://sonarr:8989
+            UN_SONARR_0_API_KEY: ${SONARR_API_KEY}
+            UN_SONARR_0_PATHS_0: /complete/tv-sonarr
+            UN_SONARR_0_PROTOCOLS: torrent
+            UN_SONARR_0_TIMEOUT: 10s
+            UN_SONARR_0_DELETE_ORIG: "false"
+            UN_SONARR_0_DELETE_DELAY: 5m
+            UN_RADARR_0_URL: http://radarr:7878
+            UN_RADARR_0_API_KEY: ${RADARR_API_KEY}
+            UN_RADARR_0_PATHS_0: /complete/radarr
+            UN_RADARR_0_PROTOCOLS: torrent
+            UN_RADARR_0_TIMEOUT: 10s
+            UN_RADARR_0_DELETE_ORIG: "false"
+            UN_RADARR_0_DELETE_DELAY: 5m
+            UN_LIDARR_0_URL: http://lidarr:8686
+            UN_LIDARR_0_API_KEY: ${LIDARR_API_KEY}
+            UN_LIDARR_0_PATHS_0: /complete/lidarr
+            UN_LIDARR_0_PROTOCOLS: torrent
+            UN_LIDARR_0_TIMEOUT: 10s
+            UN_LIDARR_0_DELETE_ORIG: "false"
+            UN_LIDARR_0_DELETE_DELAY: 5m
+            UN_FOLDER_0_PATH: /complete
+            UN_FOLDER_0_DELETE_AFTER: 10m
+            UN_FOLDER_0_DELETE_ORIGINAL: "false"
+            UN_FOLDER_0_DELETE_FILES: "false"
+            UN_FOLDER_0_MOVE_BACK: "false"
         security_opt:
             - no-new-privileges:true
         restart: always
-        networks:
-            - download # Needs to reach *arr services
-
-    # doplarr
-    doplarr:
-        image: lscr.io/linuxserver/doplarr:latest
-        container_name: doplarr
+        logging: *default-logging
         depends_on:
-            - radarr
             - sonarr
-        environment:
-            - PUID=${PUID:-1001}
-            - PGID=${PGID:-1001}
-            - TZ=${TZ:-America/Toronto}
-            - DISCORD__TOKEN=${DOPLARR_TOKEN}
-            - RADARR__API=${RADARR_API_KEY}
-            - RADARR__URL=http://radarr:7878
-            - SONARR__API=${SONARR_API_KEY}
-            - SONARR__URL=http://sonarr:8989
-            - DISCORD__MAX_RESULTS=${DOPLARR_MAX_RESULTS:-25}
-            - DISCORD__REQUESTED_MSG_STYLE=${DOPLARR_MSG_STYLE:-:plain}
-            - SONARR__QUALITY_PROFILE=${SONARR_QUALITY_PROFILE:-Any}
-            - RADARR__QUALITY_PROFILE=${RADARR_QUALITY_PROFILE:-Any}
-            - SONARR__ROOTFOLDER=${SONARR_ROOT_FOLDER:-/shows}
-            - RADARR__ROOTFOLDER=${RADARR_ROOT_FOLDER:-/movies}
-            - SONARR__LANGUAGE_PROFILE=${SONARR_LANGUAGE_PROFILE:-English}
-            - OVERSEERR__DEFAULT_ID=
-            - PARTIAL_SEASONS=true
-            - LOG_LEVEL=:info
-        restart: always
-        healthcheck:
-            test: ["CMD-SHELL", "pgrep -f doplarr || exit 1"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
-            start_period: 30s
+            - radarr
+            - lidarr
         networks:
-            - download # Depends on *arr services
+            - download
+        deploy:
+            resources:
+                limits:
+                    memory: 512M
+
+    # overseerr - media request management (web UI for friends/family)
+    overseerr:
+        image: lscr.io/linuxserver/overseerr:latest
+        container_name: overseerr
+        environment:
+            <<: *common-env
+        volumes:
+            - overseerr_data:/config
+        ports:
+            - "5055:5055"
+        restart: always
+        logging: *default-logging
+        depends_on:
+            - sonarr
+            - radarr
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:5055/api/v1/status"]
+            <<: *healthcheck-defaults
+            start_period: 40s
+        networks:
+            - download
+            - media
+        deploy:
+            resources:
+                limits:
+                    memory: 512M
+
+    # =============================================================================
+    # MEDIA PROCESSING
+    # =============================================================================
+
+    # tdarr - automated media transcoding with NVIDIA CUDA
+    tdarr:
+        image: ghcr.io/haveagitgat/tdarr:latest
+        container_name: tdarr
+        runtime: nvidia
+        deploy:
+            resources:
+                limits:
+                    memory: 4G
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: all
+                          capabilities: [compute, utility, video]
+        environment:
+            <<: *common-env
+            serverIP: 0.0.0.0
+            serverPort: 8266
+            webUIPort: 8265
+            internalNode: "true"
+            inContainer: "true"
+            ffmpegVersion: 6
+            nodeName: Sullivan
+            NVIDIA_VISIBLE_DEVICES: all
+            NVIDIA_DRIVER_CAPABILITIES: all
+        volumes:
+            - tdarr_server_data:/app/server
+            - tdarr_configs:/app/configs
+            - /tmp/tdarr:/temp
+            # MEDIA: Libraries to scan and transcode
+            - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies
+            - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows
+            - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music
+        ports:
+            - "8265:8265"
+            - "8266:8266"
+        restart: always
+        logging: *default-logging
+        devices:
+            - /dev/dri:/dev/dri
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8265"]
+            <<: *healthcheck-defaults
+            start_period: 60s
+        networks:
+            - media
+
+    # recyclarr - sync TRaSH Guides quality profiles to Sonarr/Radarr
+    recyclarr:
+        image: ghcr.io/recyclarr/recyclarr:latest
+        container_name: recyclarr
+        environment:
+            TZ: ${TZ:-America/Toronto}
+            RECYCLARR_CREATE_CONFIG: "true"
+        volumes:
+            - recyclarr_data:/config
+        restart: unless-stopped
+        logging: *default-logging
+        depends_on:
+            - sonarr
+            - radarr
+        networks:
+            - download
+        deploy:
+            resources:
+                limits:
+                    memory: 256M
 
     # =============================================================================
     # UTILITY SERVICES
@@ -541,22 +683,19 @@ services:
         ports:
             - "5452:5452"
         environment:
-            - PUID=${PUID:-1001}
-            - PGID=${PGID:-1001}
-            - TZ=${TZ:-America/Toronto}
-            - FILEBOT_NODE_AUTH=BASIC
-            - FILEBOT_NODE_AUTH_USER=${FILEBOT_USER}
-            - FILEBOT_NODE_AUTH_PASS=${FILEBOT_PASSWORD}
+            <<: *common-env
+            FILEBOT_NODE_AUTH: BASIC
+            FILEBOT_NODE_AUTH_USER: ${FILEBOT_USER}
+            FILEBOT_NODE_AUTH_PASS: ${FILEBOT_PASSWORD}
         restart: always
+        logging: *default-logging
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:5452"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
+            <<: *healthcheck-defaults
             start_period: 40s
         networks:
             - utilities
-            - download # If it needs access to downloads
+            - download
 
     # youtube-dl
     ytdl_material:
@@ -566,11 +705,12 @@ services:
         image: ytdl_material_custom:latest
         container_name: ytdl_material
         environment:
-            - ytdl_mongodb_connection_string=mongodb://ytdl-mongo-db:27017
-            - ytdl_use_local_db=false
-            - write_ytdl_config=true
+            ytdl_mongodb_connection_string: mongodb://ytdl-mongo-db:27017
+            ytdl_use_local_db: "false"
+            write_ytdl_config: "true"
         depends_on:
-            - ytdl-mongo-db
+            ytdl-mongo-db:
+                condition: service_healthy
         volumes:
             # DATA: Application data
             - ytdl_data:/app/appdata
@@ -580,25 +720,26 @@ services:
         ports:
             - "8998:17442"
         restart: always
+        logging: *default-logging
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:17442"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
+            <<: *healthcheck-defaults
             start_period: 60s
         networks:
             - utilities
-            - database # For MongoDB access
+            - database
+        deploy:
+            resources:
+                limits:
+                    memory: 1G
 
     # duplicati
     duplicati:
         image: lscr.io/linuxserver/duplicati:latest
         container_name: duplicati
         environment:
-            - PUID=${PUID:-1001}
-            - PGID=${PGID:-1001}
-            - TZ=${TZ:-America/Toronto}
-            - SETTINGS_ENCRYPTION_KEY=${DUPLICATI_ENCRYPTION_KEY}
+            <<: *common-env
+            SETTINGS_ENCRYPTION_KEY: ${DUPLICATI_ENCRYPTION_KEY}
         volumes:
             # DATA: Application data
             - duplicati_data:/config
@@ -608,97 +749,106 @@ services:
         ports:
             - "8200:8200"
         restart: always
+        logging: *default-logging
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:8200"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
+            <<: *healthcheck-defaults
             start_period: 40s
         networks:
             - utilities
+        deploy:
+            resources:
+                limits:
+                    memory: 512M
 
     # mealie
     mealie:
-        image: ghcr.io/mealie-recipes/mealie:nightly
+        image: ghcr.io/mealie-recipes/mealie:latest
         container_name: mealie
         environment:
-            - PUID=${PUID:-1001}
-            - PGID=${PGID:-1001}
-            - TZ=${TZ:-America/Toronto}
-            - ALLOW_SIGNUP=true
-            - PGUSERDB=mealie
-            - PGPASSWORD=${MEALIE_DB_PASSWORD}
-            - LDAP_AUTH_ENABLED=false
-            - MAX_WORKERS=1
-            - WEB_CONCURRENCY=1
-            - BASE_URL=${MEALIE_BASE_URL:-http://localhost:9925}
+            <<: *common-env
+            ALLOW_SIGNUP: "true"
+            PGUSERDB: mealie
+            PGPASSWORD: ${MEALIE_DB_PASSWORD}
+            LDAP_AUTH_ENABLED: "false"
+            MAX_WORKERS: 1
+            WEB_CONCURRENCY: 1
+            BASE_URL: ${MEALIE_BASE_URL:-http://localhost:9925}
         volumes:
             # DATA: Application data and recipes
             - mealie_data:/app/data
         ports:
             - "9925:9000"
         restart: always
+        logging: *default-logging
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:9000/api/app/about"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
+            <<: *healthcheck-defaults
             start_period: 60s
         networks:
             - utilities
+        deploy:
+            resources:
+                limits:
+                    memory: 512M
 
     # grocy
     grocy:
         image: lscr.io/linuxserver/grocy:latest
         container_name: grocy
         environment:
-            - PUID=${PUID:-1001}
-            - PGID=${PGID:-1001}
-            - TZ=${TZ:-America/Toronto}
+            <<: *common-env
         volumes:
             # DATA: Application data
             - grocy_data:/config
         ports:
             - "9283:80"
         restart: always
+        logging: *default-logging
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:80"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
+            <<: *healthcheck-defaults
             start_period: 40s
         networks:
             - utilities
+        deploy:
+            resources:
+                limits:
+                    memory: 256M
 
     # wiki.js - knowledge management and documentation
     wiki:
         image: ghcr.io/requarks/wiki:2
         container_name: wiki
         depends_on:
-            - wiki-postgres
+            wiki-postgres:
+                condition: service_healthy
         environment:
-            - TZ=${TZ:-America/Toronto}
-            - DB_TYPE=postgres
-            - DB_HOST=wiki-postgres
-            - DB_PORT=5432
-            - DB_USER=${WIKI_DB_USER:-wikijs}
-            - DB_PASS=${WIKI_DB_PASSWORD:-wikijsrocks}
-            - DB_NAME=${WIKI_DB_NAME:-wiki}
+            TZ: ${TZ:-America/Toronto}
+            DB_TYPE: postgres
+            DB_HOST: wiki-postgres
+            DB_PORT: 5432
+            DB_USER: ${WIKI_DB_USER:-wikijs}
+            DB_PASS: ${WIKI_DB_PASSWORD}
+            DB_NAME: ${WIKI_DB_NAME:-wiki}
         volumes:
             # DATA: Application data
             - wiki_data:/config
         ports:
             - "8090:3000"
         restart: always
+        logging: *default-logging
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
+            <<: *healthcheck-defaults
             start_period: 60s
         networks:
             - utilities
-            - database # For Postgres access
+            - database
+        deploy:
+            resources:
+                limits:
+                    memory: 512M
 
     # =============================================================================
     # DATABASE SERVICES
@@ -715,30 +865,25 @@ services:
             - ytdl_mongodb:/data/db
         restart: always
         healthcheck:
-            test:
-                [
-                    "CMD",
-                    "mongosh",
-                    "--eval",
-                    "db.runCommand('ping').ok",
-                    "--quiet",
-                ]
-            interval: 30s
-            timeout: 10s
-            retries: 3
+            test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok", "--quiet"]
+            <<: *healthcheck-defaults
             start_period: 40s
         networks:
             - database
+        deploy:
+            resources:
+                limits:
+                    memory: 512M
 
     # wiki-postgres - database for wiki.js
     wiki-postgres:
         image: postgres:15-alpine
         container_name: wiki-postgres
         environment:
-            - POSTGRES_DB=${WIKI_DB_NAME:-wiki}
-            - POSTGRES_USER=${WIKI_DB_USER:-wikijs}
-            - POSTGRES_PASSWORD=${WIKI_DB_PASSWORD:-123456}
-            - TZ=${TZ:-America/Toronto}
+            POSTGRES_DB: ${WIKI_DB_NAME:-wiki}
+            POSTGRES_USER: ${WIKI_DB_USER:-wikijs}
+            POSTGRES_PASSWORD: ${WIKI_DB_PASSWORD}
+            TZ: ${TZ:-America/Toronto}
         volumes:
             # DATA: Database files
             - wiki_postgres:/var/lib/postgresql/data
@@ -747,9 +892,11 @@ services:
         restart: unless-stopped
         healthcheck:
             test: ["CMD-SHELL", "pg_isready -U ${WIKI_DB_USER:-wikijs}"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
+            <<: *healthcheck-defaults
             start_period: 40s
         networks:
             - database
+        deploy:
+            resources:
+                limits:
+                    memory: 512M
