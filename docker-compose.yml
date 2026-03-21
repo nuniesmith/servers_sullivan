@@ -705,7 +705,7 @@ services:
         build:
             context: ./services/ytdl-material
             dockerfile: Dockerfile
-        image: ytdl_material_custom:latest
+        image: nuniesmith/sullivan:ytdl_material
         container_name: ytdl_material
         environment:
             ytdl_mongodb_connection_string: mongodb://ytdl-mongo-db:27017
