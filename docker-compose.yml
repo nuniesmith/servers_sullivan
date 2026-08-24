@@ -648,8 +648,9 @@ services:
       - media
 
   # recyclarr - sync TRaSH Guides quality profiles to Sonarr/Radarr
+  # NOTE: recyclarr publishes no "latest" tag - pin to the major version
   recyclarr:
-    image: ghcr.io/recyclarr/recyclarr:latest
+    image: ghcr.io/recyclarr/recyclarr:8
     container_name: recyclarr
     environment:
       TZ: ${TZ:-America/Toronto}
