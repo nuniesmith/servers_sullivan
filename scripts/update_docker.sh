@@ -14,6 +14,29 @@ if ! docker compose version &>/dev/null; then
   exit 1
 fi
 
+# The CI/CD pipeline deploys by running `docker compose down` + `up` over SSH in
+# this same directory, as this same user. Two concurrent compose runs on one
+# project fight over containers and networks - the second one fails with
+# "container name is already in use". Serialise on a shared lock so a manual
+# update waits for an in-flight deploy (and vice versa) instead of colliding.
+LOCK_FILE="${HOME}/.sullivan-compose.lock"
+LOCK_WAIT=900
+
+if command -v flock &>/dev/null; then
+  exec 9>"$LOCK_FILE"
+  if ! flock -n 9; then
+    log "INFO: Another compose operation holds $LOCK_FILE (CI/CD deploy or a second update run)."
+    log "INFO: Waiting up to ${LOCK_WAIT}s for it to finish..."
+    if ! flock -w "$LOCK_WAIT" 9; then
+      log "ERROR: Timed out after ${LOCK_WAIT}s waiting for $LOCK_FILE."
+      log "ERROR: Check for a stuck deploy before retrying."
+      exit 1
+    fi
+  fi
+else
+  log "WARN: flock not found - running without a lock. A concurrent CI/CD deploy may cause container name conflicts."
+fi
+
 log "INFO: Starting Docker update process..."
 
 log "INFO: Pulling all images..."
@@ -42,7 +65,7 @@ log "INFO: Stopping all services..."
 docker compose down
 
 log "INFO: Starting all services..."
-docker compose up -d
+docker compose up -d --remove-orphans
 
 log "INFO: Cleaning up unused Docker resources..."
 docker system prune -f

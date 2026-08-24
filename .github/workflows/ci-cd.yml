@@ -275,6 +275,21 @@ jobs:
                       echo "🌿 Git branch: $(git branch --show-current)"
                       echo "📝 Latest commit: $(git log -1 --oneline)"
 
+                      # Take the same lock scripts/update_docker.sh uses, so a manual
+                      # update running on the box cannot interleave its down/up with
+                      # this deploy's - concurrent compose runs on one project fail
+                      # with "container name is already in use".
+                      if command -v flock >/dev/null 2>&1; then
+                        exec 9>"${HOME}/.sullivan-compose.lock"
+                        echo "🔒 Acquiring compose lock..."
+                        if ! flock -w 900 9; then
+                          echo "❌ Timed out waiting for the compose lock - is a manual update stuck?"
+                          exit 1
+                        fi
+                      else
+                        echo "⚠️  flock not available - deploying without a lock"
+                      fi
+
                       # Stop and remove existing containers + networks
                       # (run.sh stop only stops containers without removing them,
                       #  causing name conflicts on docker compose up)
